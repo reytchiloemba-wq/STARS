@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 222 47% 4%;
+  --surface: 222 32% 8%;
+  --surface-raised: 222 28% 12%;
+  --border: 222 20% 18%;
+  --foreground: 210 40% 98%;
+  --muted: 222 20% 14%;
+  --muted-foreground: 215 16% 65%;
+  --primary: 189 94% 55%;
+  --primary-foreground: 222 47% 4%;
+}
+
+/* Light mode is opt-in */
+[data-theme='light'] {
+  --background: 0 0% 100%;
+  --surface: 210 20% 98%;
+  --surface-raised: 0 0% 100%;
+  --border: 214 15% 88%;
+  --foreground: 222 47% 8%;
+  --muted: 210 20% 95%;
+  --muted-foreground: 215 12% 40%;
+  --primary: 199 89% 44%;
+  --primary-foreground: 0 0% 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Custom discreet scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Glassmorphism & Modern UI utilities */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  background: rgba(15, 23, 42, 0.75);
+  border-color: rgba(34, 211, 238, 0.35);
+  box-shadow: 0 10px 30px -10px rgba(34, 211, 238, 0.15);
+  transform: translateY(-2px);
+}
+
+.demo-badge {
+  @apply inline-flex items-center gap-1 rounded-full border border-accent-orange/40 bg-accent-orange/10 px-2.5 py-0.5 text-xs font-semibold text-accent-orange shadow-sm;
+}
+
+.glow-gradient-border {
+  position: relative;
+}
+
+.glow-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(90deg, #22D3EE, #3B82F6, #8B5CF6, #D946EF);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}

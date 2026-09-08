@@ -1,0 +1,1252 @@
+// STARS — multi-tenant data model.
+//
+// Isolation rule enforced across this schema: every table that holds
+// tenant-owned data carries a mandatory `organizationId`, and every unique
+// constraint that could otherwise leak across tenants is composed with it.
+// Application-level enforcement lives in src/lib/tenant.ts — no query against
+// a tenant-scoped model may run without a verified organizationId in scope
+// (see tests/isolation.test.ts).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity, organizations (tenants), membership, RBAC
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  isSuperAdmin Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships    Membership[]
+  ownedOrgs      Organization[]  @relation("OrganizationOwner")
+  draftVersions  DraftVersion[]
+  comments       Comment[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+  searchSessions SearchSession[]
+  consents       Consent[]
+  rotatedSecrets SecretVersion[]
+}
+
+// A tenant. Every piece of tenant-owned data below references this id.
+model Organization {
+  id                  String    @id @default(cuid())
+  slug                String    @unique
+  name                String
+  logoUrl             String?
+  country             String?
+  language            String    @default("fr")
+  currency            String    @default("EUR")
+  timezone            String    @default("Europe/Paris")
+  industry            String?
+  size                String?
+  status              OrgStatus @default(ACTIVE)
+  editorialCharter    String?
+  retentionPolicyDays Int       @default(365)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  ownerId String
+  owner   User   @relation("OrganizationOwner", fields: [ownerId], references: [id])
+
+  memberships        Membership[]
+  brands             Brand[]
+  watchedDomains     OrganizationDomain[]
+  watchlists         Watchlist[]
+  alerts             Alert[]
+  brandVoices        BrandVoice[]
+  drafts             Draft[]
+  mediaAssets        MediaAsset[]
+  socialAccounts     SocialAccount[]
+  publications       Publication[]
+  schedules          Schedule[]
+  approvals          Approval[]
+  analyticsSnapshots AnalyticsSnapshot[]
+  subscription       Subscription?
+  usage              Usage?
+  creditWallet       CreditWallet?
+  creditTransactions CreditTransaction[]
+  sources            Source[]
+  searchSessions     SearchSession[]
+  searchRequests     SearchRequest[]
+  topics             Topic[]
+  tags               Tag[]
+  analyses           Analysis[]
+  notifications      Notification[]
+  integrations       Integration[]
+  consents           Consent[]
+  auditLogs          AuditLog[]
+  invitations        Invitation[]
+  oauthStates        OAuthState[]
+  costRecords        CostRecord[]
+}
+
+enum OrgStatus {
+  ACTIVE
+  TRIAL
+  SUSPENDED
+  CANCELLED
+}
+
+// Custom, per-organization role definitions (Business/Enterprise) sit on top
+// of the fixed RoleName enum used for baseline permission checks.
+model Membership {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           RoleName
+  customRoleId   String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customRole   CustomRole?  @relation(fields: [customRoleId], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+}
+
+enum RoleName {
+  OWNER
+  ADMIN
+  BILLING_MANAGER
+  EDITOR_IN_CHIEF
+  ANALYST
+  JOURNALIST
+  FACT_CHECKER
+  WRITER
+  APPROVER
+  COMMUNITY_MANAGER
+  READER
+}
+
+model CustomRole {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  permissions    String[] // permission keys, see src/lib/rbac.ts
+  createdAt      DateTime @default(now())
+
+  memberships Membership[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model Invitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           RoleName
+  token          String    @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+}
+
+// A brand/sub-entity inside a tenant (see spec section: "Espaces, équipes et marques").
+model Brand {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  colors         Json?
+  createdAt      DateTime @default(now())
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brandVoices    BrandVoice[]
+  drafts         Draft[]
+  socialAccounts SocialAccount[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Billing (Stripe adapter target — see src/server/adapters/billing)
+// ---------------------------------------------------------------------------
+
+model Plan {
+  id                String @id @default(cuid())
+  key               String @unique // discovery | creator | professional | business | enterprise
+  name              String
+  monthlyPriceCents Int
+  annualPriceCents  Int
+  quotas            Json // { directSearches, topicsAnalyzed, domains, alerts, sources, seats, brandVoices, socialAccounts, publications, aiImages, briefings, historyDays, storageGb, apiAccess }
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                   String       @id @default(cuid())
+  organizationId       String       @unique
+  planId               String
+  status               SubStatus    @default(TRIALING)
+  billingCycle         BillingCycle @default(MONTHLY)
+  trialEndsAt          DateTime?
+  currentPeriodEnd     DateTime?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         Plan         @relation(fields: [planId], references: [id])
+}
+
+enum SubStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+enum BillingCycle {
+  MONTHLY
+  ANNUAL
+}
+
+model Usage {
+  id                String   @id @default(cuid())
+  organizationId    String   @unique
+  periodStart       DateTime
+  periodEnd         DateTime
+  directSearches    Int      @default(0)
+  topicsAnalyzed    Int      @default(0)
+  aiImagesGenerated Int      @default(0)
+  publications      Int      @default(0)
+  storageBytes      BigInt   @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// STARS Credits — the metering unit for AI-costed operations (spec §3).
+// Balance changes only ever go through credits.service.ts's conditional
+// atomic decrement (`updateMany` guarded by `balance >= amount`), which is
+// what actually prevents a negative/racy balance — this model has no
+// DB-level CHECK constraint of its own.
+model CreditWallet {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  balance        Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  transactions CreditTransaction[]
+
+  @@index([organizationId])
+}
+
+model CreditTransaction {
+  id             String       @id @default(cuid())
+  organizationId String
+  walletId       String
+  amount         Int // positive = credit granted/purchased, negative = debit
+  reason         CreditReason
+  balanceAfter   Int
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  wallet       CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([walletId])
+}
+
+enum CreditReason {
+  MONTHLY_ALLOWANCE
+  ANALYSIS_EXPRESS
+  ANALYSIS_DEEP
+  ANALYSIS_STRATEGIC
+  DOSSIER_REFRESH
+  AI_ILLUSTRATION
+  EXTRA_VARIANT_PACK
+  AUTOMATED_BRIEFING
+  CREDIT_PACK_PURCHASE
+  MANUAL_ADJUSTMENT
+}
+
+// Dedup table for Stripe webhook delivery — Stripe retries on timeout, so the
+// same event id can arrive more than once. Not tenant-scoped: a webhook event
+// id is a Stripe-global identifier, checked before any tenant-scoped side
+// effect runs.
+model ProcessedWebhookEvent {
+  id          String   @id // Stripe event id (evt_...)
+  type        String
+  processedAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Global taxonomy (mutualized — NOT tenant scoped)
+// ---------------------------------------------------------------------------
+
+model Category {
+  id       String     @id @default(cuid())
+  key      String     @unique
+  label    String
+  labelEn  String?
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+
+  organizationDomains OrganizationDomain[]
+  topics              Topic[]
+}
+
+// A tenant's followed domain — links the global Category to per-org config.
+model OrganizationDomain {
+  id             String   @id @default(cuid())
+  organizationId String
+  categoryId     String
+  keywords       String[]
+  exclusions     String[]
+  territories    String[]
+  languages      String[]
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category     Category     @relation(fields: [categoryId], references: [id])
+
+  @@unique([organizationId, categoryId])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Global source & content graph (mutualized public metadata)
+// ---------------------------------------------------------------------------
+
+model Source {
+  id                   String       @id @default(cuid())
+  organizationId       String? // null = global/mutualized source; set = a private tenant-added source
+  name                 String
+  url                  String
+  country              String?
+  language             String?
+  type                 SourceType
+  transparencyLevel    Int          @default(0) // 0-100
+  correctionsPolicyUrl String?
+  lastVerifiedAt       DateTime?
+  status               SourceStatus @default(ACTIVE)
+  createdAt            DateTime     @default(now())
+
+  organization Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  articles     Article[]
+  ratings      SourceRating[]
+
+  @@index([organizationId])
+}
+
+enum SourceType {
+  PRIMARY
+  REFERENCE_MEDIA
+  SPECIALIZED_MEDIA
+  INSTITUTION
+  SCIENTIFIC_STUDY
+  ACADEMIC_PUBLICATION
+  EXPERT
+  WIRE_AGENCY
+  PRESS_RELEASE
+  OPINION
+  SPONSORED
+  UNVERIFIED
+}
+
+enum SourceStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model SourceRating {
+  id         String   @id @default(cuid())
+  sourceId   String
+  score      Int
+  criteria   Json
+  computedAt DateTime @default(now())
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+}
+
+model Author {
+  id       String    @id @default(cuid())
+  name     String
+  bio      String?
+  articles Article[]
+}
+
+model Expert {
+  id                     String     @id @default(cuid())
+  name                   String
+  photoUrl               String?
+  role                   String?
+  organizationName       String?
+  country                String?
+  expertise              String[]
+  expertType             ExpertType
+  conflictOfInterestNote String?
+
+  perspectives Perspective[]
+}
+
+enum ExpertType {
+  RESEARCHER
+  ACADEMIC
+  PROFESSIONAL
+  EXECUTIVE
+  ANALYST
+  CONSULTANT
+  INSTITUTIONAL_REPRESENTATIVE
+  POLITICAL_OFFICIAL
+  ACTIVIST
+  COLUMNIST
+}
+
+// Global public article metadata (mutualized). Never stores full protected text.
+model Article {
+  id           String   @id @default(cuid())
+  sourceId     String
+  authorId     String?
+  title        String
+  excerpt      String? // limited excerpt only — respects copyright/paywalls
+  canonicalUrl String   @unique
+  language     String
+  country      String?
+  publishedAt  DateTime
+  isUpdate     Boolean  @default(false)
+  isCorrection Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  source        Source                @relation(fields: [sourceId], references: [id])
+  author        Author?               @relation(fields: [authorId], references: [id])
+  topicClusters TopicClusterArticle[]
+  citations     Citation[]
+
+  @@index([sourceId])
+  @@index([publishedAt])
+}
+
+// A world event/subject clustering multiple articles (mutualized, global).
+model TopicCluster {
+  id              String   @id @default(cuid())
+  title           String
+  summary         String?
+  firstSeenAt     DateTime
+  lastUpdatedAt   DateTime @updatedAt
+  importance      Int      @default(0)
+  confidenceScore Int      @default(0)
+
+  articles TopicClusterArticle[]
+  topics   Topic[]
+}
+
+model TopicClusterArticle {
+  id             String @id @default(cuid())
+  topicClusterId String
+  articleId      String
+
+  topicCluster TopicCluster @relation(fields: [topicClusterId], references: [id], onDelete: Cascade)
+  article      Article      @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([topicClusterId, articleId])
+}
+
+// ---------------------------------------------------------------------------
+// Tenant-scoped: topics the org is tracking, and the analysis dossier built
+// from a global TopicCluster (or an ad-hoc STARS Direct query).
+// ---------------------------------------------------------------------------
+
+model Topic {
+  id             String      @id @default(cuid())
+  organizationId String
+  topicClusterId String?
+  categoryId     String?
+  title          String
+  status         TopicStatus @default(NEW)
+  savedAt        DateTime?
+  followedAt     DateTime?
+  createdAt      DateTime    @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  topicCluster TopicCluster? @relation(fields: [topicClusterId], references: [id])
+  category     Category?     @relation(fields: [categoryId], references: [id])
+  analyses     Analysis[]
+  drafts       Draft[]
+  alerts       Alert[]
+  tags         TagOnTopic[]
+
+  @@index([organizationId])
+}
+
+enum TopicStatus {
+  NEW
+  SAVED
+  FOLLOWED
+  ANALYZED
+  ARCHIVED
+}
+
+model Tag {
+  id             String @id @default(cuid())
+  organizationId String
+  label          String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  topics       TagOnTopic[]
+
+  @@unique([organizationId, label])
+  @@index([organizationId])
+}
+
+model TagOnTopic {
+  tagId   String
+  topicId String
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([tagId, topicId])
+}
+
+model Entity {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  type   String // person | organization | place | technology | regulation
+  claims Claim[]
+}
+
+// A STARS Direct free-text query, always tenant scoped.
+model SearchRequest {
+  id             String      @id @default(cuid())
+  organizationId String
+  userId         String
+  rawQuery       String
+  depth          SearchDepth @default(EXPRESS)
+  filters        Json?
+  createdAt      DateTime    @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  session      SearchSession?
+
+  @@index([organizationId])
+}
+
+enum SearchDepth {
+  EXPRESS
+  DEEP
+  STRATEGIC
+}
+
+model SearchSession {
+  id              String   @id @default(cuid())
+  organizationId  String
+  userId          String
+  searchRequestId String?  @unique
+  createdAt       DateTime @default(now())
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id])
+  searchRequest SearchRequest? @relation(fields: [searchRequestId], references: [id])
+
+  @@index([organizationId])
+}
+
+// The analysis dossier — tenant scoped, always traceable to sourced Citations.
+model Analysis {
+  id               String   @id @default(cuid())
+  organizationId   String
+  topicId          String
+  executiveSummary String?
+  confidenceScore  Int?
+  insufficientData Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  topic        Topic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  claims         Claim[]
+  timelineEvents TimelineEvent[]
+  thesis         Thesis?
+  antithesis     Antithesis?
+  drafts         Draft[]
+
+  @@index([organizationId])
+  @@index([topicId])
+}
+
+enum ClaimStatus {
+  ESTABLISHED_FACT
+  REPORTED_UNCONFIRMED
+  ASSERTION
+  ANALYSIS
+  OPINION
+  HYPOTHESIS
+  OPEN_QUESTION
+}
+
+model Claim {
+  id         String      @id @default(cuid())
+  analysisId String
+  entityId   String?
+  status     ClaimStatus
+  text       String
+
+  analysis Analysis   @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  entity   Entity?    @relation(fields: [entityId], references: [id])
+  evidence Evidence[]
+
+  @@index([analysisId])
+}
+
+model Evidence {
+  id         String @id @default(cuid())
+  claimId    String
+  citationId String
+
+  claim    Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  citation Citation @relation(fields: [citationId], references: [id])
+
+  @@index([claimId])
+}
+
+// Every citation resolves to a real Article/Source — no invented URLs.
+model Citation {
+  id        String  @id @default(cuid())
+  articleId String
+  quote     String?
+
+  article  Article    @relation(fields: [articleId], references: [id])
+  evidence Evidence[]
+
+  @@index([articleId])
+}
+
+model TimelineEvent {
+  id          String   @id @default(cuid())
+  analysisId  String
+  occurredAt  DateTime
+  title       String
+  description String?
+
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model Thesis {
+  id          String   @id @default(cuid())
+  analysisId  String   @unique
+  summary     String
+  strengths   String[]
+  limitations String[]
+
+  analysis     Analysis      @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  perspectives Perspective[]
+}
+
+model Antithesis {
+  id          String   @id @default(cuid())
+  analysisId  String   @unique
+  summary     String
+  strengths   String[]
+  limitations String[]
+
+  analysis     Analysis      @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  perspectives Perspective[]
+}
+
+model Perspective {
+  id              String  @id @default(cuid())
+  thesisId        String?
+  antithesisId    String?
+  expertId        String?
+  statement       String
+  sourceArticleId String?
+
+  thesis     Thesis?     @relation(fields: [thesisId], references: [id], onDelete: Cascade)
+  antithesis Antithesis? @relation(fields: [antithesisId], references: [id], onDelete: Cascade)
+  expert     Expert?     @relation(fields: [expertId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Watchlists & alerts (tenant scoped)
+// ---------------------------------------------------------------------------
+
+model Watchlist {
+  id             String        @id @default(cuid())
+  organizationId String
+  label          String
+  kind           WatchlistKind
+  value          String
+  createdAt      DateTime      @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+enum WatchlistKind {
+  COMPANY
+  PERSON
+  KEYWORD
+  TERRITORY
+}
+
+model Alert {
+  id             String   @id @default(cuid())
+  organizationId String
+  topicId        String?
+  label          String
+  triggerRule    Json
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  topic        Topic?       @relation(fields: [topicId], references: [id])
+
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Editorial studio: Brand Voice, drafts, media, approvals (tenant scoped)
+// ---------------------------------------------------------------------------
+
+model BrandVoice {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  brandId             String?
+  name                String
+  sector              String?
+  audience            String?
+  values              String[]
+  tone                String?
+  preferredVocabulary String[]
+  forbiddenTerms      String[]
+  technicalLevel      String?
+  boldnessLevel       Int      @default(3)
+  signature           String?
+  hashtags            String[]
+  callToAction        String?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brand        Brand?       @relation(fields: [brandId], references: [id])
+  drafts       Draft[]
+
+  @@index([organizationId])
+}
+
+model Draft {
+  id             String          @id @default(cuid())
+  organizationId String
+  brandId        String?
+  topicId        String?
+  analysisId     String?
+  brandVoiceId   String?
+  ownerId        String
+  network        SocialNetwork
+  objective      String?
+  tone           String?
+  status         EditorialStatus @default(IDEA)
+  currentContent String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brand        Brand?         @relation(fields: [brandId], references: [id])
+  topic        Topic?         @relation(fields: [topicId], references: [id])
+  analysis     Analysis?      @relation(fields: [analysisId], references: [id])
+  brandVoice   BrandVoice?    @relation(fields: [brandVoiceId], references: [id])
+  versions     DraftVersion[]
+  comments     Comment[]
+  approvals    Approval[]
+  mediaAssets  MediaAsset[]
+  publications Publication[]
+
+  @@index([organizationId])
+}
+
+enum SocialNetwork {
+  LINKEDIN
+  INSTAGRAM
+  FACEBOOK
+  X
+}
+
+enum EditorialStatus {
+  IDEA
+  COLLECTING
+  ANALYZING
+  TO_VERIFY
+  DRAFT
+  READY_FOR_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  ARCHIVED
+}
+
+model DraftVersion {
+  id           String   @id @default(cuid())
+  draftId      String
+  authorId     String
+  content      String
+  variantLabel String?
+  createdAt    DateTime @default(now())
+
+  draft  Draft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id])
+
+  @@index([draftId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  draftId   String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  draft  Draft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id])
+
+  @@index([draftId])
+}
+
+model Approval {
+  id             String           @id @default(cuid())
+  organizationId String
+  draftId        String
+  approverId     String
+  decision       ApprovalDecision
+  note           String?
+  decidedAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  draft        Draft        @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([draftId])
+}
+
+enum ApprovalDecision {
+  APPROVED
+  CHANGES_REQUESTED
+  REJECTED
+}
+
+model MediaAsset {
+  id             String    @id @default(cuid())
+  organizationId String
+  draftId        String?
+  kind           MediaKind
+  url            String
+  altText        String?
+  aiPrompt       String?
+  aiGenerated    Boolean   @default(false)
+  licenseNote    String?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  draft        Draft?       @relation(fields: [draftId], references: [id])
+
+  @@index([organizationId])
+}
+
+enum MediaKind {
+  LICENSED_SOURCE_IMAGE
+  STOCK_IMAGE
+  AI_GENERATED
+  USER_UPLOAD
+}
+
+// ---------------------------------------------------------------------------
+// Social publishing (tenant scoped — a social account belongs to exactly one org)
+// ---------------------------------------------------------------------------
+
+model SocialAccount {
+  id              String              @id @default(cuid())
+  organizationId  String
+  brandId         String?
+  network         SocialNetwork
+  externalId      String
+  displayName     String
+  scopes          String[]
+  accessTokenEnc  String // encrypted at rest — never store plaintext tokens
+  refreshTokenEnc String?
+  expiresAt       DateTime?
+  connectedById   String
+  lastUsedAt      DateTime?
+  status          SocialAccountStatus @default(ACTIVE)
+  createdAt       DateTime            @default(now())
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brand              Brand?              @relation(fields: [brandId], references: [id])
+  publicationTargets PublicationTarget[]
+
+  @@unique([organizationId, network, externalId])
+  @@index([organizationId])
+}
+
+enum SocialAccountStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+model Publication {
+  id             String            @id @default(cuid())
+  organizationId String
+  draftId        String
+  idempotencyKey String            @unique
+  status         PublicationStatus @default(QUEUED)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  draft        Draft               @relation(fields: [draftId], references: [id])
+  targets      PublicationTarget[]
+  schedule     Schedule?
+
+  @@index([organizationId])
+}
+
+enum PublicationStatus {
+  QUEUED
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+model PublicationTarget {
+  id              String            @id @default(cuid())
+  publicationId   String
+  socialAccountId String
+  status          PublicationStatus @default(QUEUED)
+  externalPostId  String?
+  errorMessage    String?
+  publishedAt     DateTime?
+
+  publication   Publication   @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id])
+
+  @@unique([publicationId, socialAccountId])
+}
+
+model Schedule {
+  id             String   @id @default(cuid())
+  organizationId String
+  publicationId  String   @unique
+  runAt          DateTime
+  timezone       String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  publication  Publication  @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Analytics, notifications, integrations, consent, audit (tenant scoped)
+// ---------------------------------------------------------------------------
+
+model AnalyticsSnapshot {
+  id              String   @id @default(cuid())
+  organizationId  String
+  socialAccountId String?
+  draftId         String?
+  capturedAt      DateTime @default(now())
+  metrics         Json // impressions, reach, reactions, comments, shares, clicks...
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model Notification {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String
+  kind           String
+  payload        Json
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+}
+
+model Integration {
+  id             String   @id @default(cuid())
+  organizationId String
+  provider       String // e.g. "linkedin", "stripe", "openai"
+  configEnc      String? // encrypted config blob
+  status         String   @default("disconnected")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model Consent {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String
+  kind           String // e.g. "ai_training_on_private_data"
+  granted        Boolean
+  grantedAt      DateTime?
+  revokedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+}
+
+model DataRetentionPolicy {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  retentionDays  Int
+  updatedAt      DateTime @updatedAt
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  actorUserId    String?
+  action         String
+  targetType     String?
+  targetId       String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?         @relation(fields: [actorUserId], references: [id])
+
+  @@index([organizationId])
+}
+
+// Enterprise qualification form submissions (landing page §8) — a pre-signup
+// prospect, not yet a tenant, so intentionally NOT organization-scoped.
+model SalesLead {
+  id                String   @id @default(cuid())
+  company           String
+  jobTitle          String
+  companySize       String?
+  country           String?
+  email             String
+  seatsNeeded       String?
+  brandsNeeded      String?
+  monitoringNeeds   String?
+  networks          String[]
+  publicationVolume String?
+  securityNeeds     String?
+  message           String?
+  consent           Boolean  @default(false)
+  createdAt         DateTime @default(now())
+}
+
+// =============================================================================
+// GLOBAL INFRASTRUCTURE — Super Admin cockpit ("Infrastructure & Connexions").
+//
+// Everything below this line is Level A (spec §4): configured exclusively by
+// isSuperAdmin users, never exposed to a tenant. No tenant-facing query may
+// ever select `credentialsEnc` — see src/lib/super-admin.ts and
+// src/lib/crypto.ts. Level B (tenant OAuth authorizations) lives in the
+// existing `SocialAccount` model plus `OAuthState` below.
+// =============================================================================
+
+enum ProviderCategory {
+  SOCIAL
+  NEWS_SEARCH
+  WEB_EXTRACTION
+  AI
+  ILLUSTRATION
+  PUBLISHING
+  STORAGE
+}
+
+// Static catalog entry (what STARS knows how to connect to). Seeded from
+// src/config/providers.ts — that file is the source of truth, same pattern
+// as src/config/pricing.ts. Never tenant-scoped: this is just a menu.
+model IntegrationProvider {
+  id               String           @id @default(cuid())
+  key              String           @unique
+  name             String
+  category         ProviderCategory
+  description      String?
+  docsUrl          String?
+  isOAuth          Boolean          @default(false)
+  isPrimaryCapable Boolean          @default(true)
+
+  integrations GlobalIntegration[]
+  routingRules ProviderRoutingRule[]
+}
+
+enum IntegrationEnvironment {
+  TEST
+  PRODUCTION
+}
+
+enum IntegrationStatus {
+  NOT_CONFIGURED
+  INCOMPLETE
+  TESTING
+  OPERATIONAL
+  DEGRADED
+  QUOTA_LOW
+  QUOTA_EXHAUSTED
+  AUTH_EXPIRED
+  ERROR
+  SUSPENDED
+  REVOKED
+}
+
+// A Super-Admin-configured instance of a provider. `credentialsEnc` holds an
+// AES-256-GCM-encrypted JSON blob (see src/lib/crypto.ts) — the plaintext is
+// NEVER stored, logged, or returned to any client after creation; only
+// `credentialsFingerprint` (last 4 chars, e.g. "••••••••A7F2") is ever
+// displayed. Status is only ever set to OPERATIONAL by a real test run
+// (src/server/services/infrastructure.service.ts) — never optimistically.
+model GlobalIntegration {
+  id                     String                 @id @default(cuid())
+  providerId             String
+  environment            IntegrationEnvironment @default(TEST)
+  status                 IntegrationStatus      @default(NOT_CONFIGURED)
+  isPrimary              Boolean                @default(false)
+  credentialsEnc         String?
+  credentialsFingerprint String?
+  config                 Json? // non-secret config: redirect URIs, scopes, region, model list…
+  lastTestedAt           DateTime?
+  lastTestResult         String? // 'success' | 'failure'
+  lastTestMessage        String?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  provider               IntegrationProvider   @relation(fields: [providerId], references: [id])
+  secretVersions         SecretVersion[]
+  incidents              IntegrationIncident[]
+  costRecords            CostRecord[]
+  routingRulesAsPrimary  ProviderRoutingRule[] @relation("RoutingPrimary")
+  routingRulesAsFallback ProviderRoutingRule[] @relation("RoutingFallback")
+
+  @@unique([providerId, environment])
+}
+
+// Append-only rotation history — never stores plaintext, only who rotated
+// which integration's credentials and when (spec §18: rotation/versioning).
+model SecretVersion {
+  id                  String   @id @default(cuid())
+  globalIntegrationId String
+  fingerprint         String
+  rotatedByUserId     String
+  createdAt           DateTime @default(now())
+
+  globalIntegration GlobalIntegration @relation(fields: [globalIntegrationId], references: [id], onDelete: Cascade)
+  rotatedBy         User              @relation(fields: [rotatedByUserId], references: [id])
+
+  @@index([globalIntegrationId])
+}
+
+// AI task routing (spec §14). `taskKey` matches AiTaskKey in
+// src/server/services/ai-router.service.ts.
+model ProviderRoutingRule {
+  id         String   @id @default(cuid())
+  taskKey    String
+  providerId String
+  primaryId  String?
+  fallbackId String?
+  updatedAt  DateTime @updatedAt
+
+  provider IntegrationProvider @relation(fields: [providerId], references: [id])
+  primary  GlobalIntegration?  @relation("RoutingPrimary", fields: [primaryId], references: [id])
+  fallback GlobalIntegration?  @relation("RoutingFallback", fields: [fallbackId], references: [id])
+
+  @@unique([taskKey])
+}
+
+// Tenant-side OAuth CSRF+PKCE state (spec §10, §25 test #5: "un callback
+// OAuth falsifié est rejeté"). Single-use, short-lived, tenant-scoped.
+model OAuthState {
+  id             String        @id @default(cuid())
+  state          String        @unique
+  organizationId String
+  userId         String
+  network        SocialNetwork
+  codeVerifier   String // PKCE
+  redirectUri    String
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  createdAt      DateTime      @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+enum IncidentSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// Global (not tenant-scoped) — an incident on a piece of shared
+// infrastructure, e.g. "Meta App quota exhausted", affects all tenants using
+// it. Tenant-caused failures belong to PublicationTarget.errorMessage instead.
+model IntegrationIncident {
+  id                  String           @id @default(cuid())
+  globalIntegrationId String
+  severity            IncidentSeverity
+  message             String
+  affectedTenantCount Int              @default(0)
+  createdAt           DateTime         @default(now())
+  resolvedAt          DateTime?
+
+  globalIntegration GlobalIntegration @relation(fields: [globalIntegrationId], references: [id], onDelete: Cascade)
+
+  @@index([globalIntegrationId])
+}
+
+// FinOps (spec §19). `organizationId` is nullable because some costs (a
+// connectivity test run from the cockpit) aren't attributable to any tenant.
+model CostRecord {
+  id                  String   @id @default(cuid())
+  globalIntegrationId String
+  organizationId      String?
+  operation           String
+  costCents           Int
+  createdAt           DateTime @default(now())
+
+  globalIntegration GlobalIntegration @relation(fields: [globalIntegrationId], references: [id], onDelete: Cascade)
+  organization      Organization?     @relation(fields: [organizationId], references: [id])
+
+  @@index([globalIntegrationId])
+  @@index([organizationId])
+}
