@@ -139,9 +139,12 @@ export async function startOAuthFlow(
     response_type: 'code',
     state,
     scope: config.scopes.join(' '),
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
   });
+
+  if (network !== 'FACEBOOK' && network !== 'INSTAGRAM') {
+    params.set('code_challenge', codeChallenge);
+    params.set('code_challenge_method', 'S256');
+  }
 
   return { authorizeUrl: `${config.authorizeUrl}?${params.toString()}` };
 }
@@ -191,23 +194,40 @@ export async function completeOAuthFlow(
   const clientSecret = creds.clientSecret ?? creds.appSecret ?? '';
   const config = NETWORK_CONFIG[network];
 
+  const tokenParams: Record<string, string> = {
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+    redirect_uri: stateRow.redirectUri,
+  };
+
+  if (network !== 'FACEBOOK' && network !== 'INSTAGRAM') {
+    tokenParams.grant_type = 'authorization_code';
+    if (stateRow.codeVerifier) {
+      tokenParams.code_verifier = stateRow.codeVerifier;
+    }
+  }
+
   const tokenRes = await fetch(config.tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: stateRow.redirectUri,
-      client_id: clientId,
-      client_secret: clientSecret,
-      code_verifier: stateRow.codeVerifier,
-    }),
+    body: new URLSearchParams(tokenParams),
     signal: AbortSignal.timeout(10000),
-  }).catch(() => null);
+  }).catch((fetchErr) => {
+    console.error(`[OAuth] Network fetch error for ${network}:`, fetchErr);
+    return null;
+  });
 
   if (!tokenRes || !tokenRes.ok) {
+    const errorBody = tokenRes ? await tokenRes.text().catch(() => '') : '';
+    console.error(`[OAuth] Token exchange failed for ${network}: status=${tokenRes?.status}, body=${errorBody}`);
+    let detailMsg = `HTTP ${tokenRes?.status ?? 'réseau'}`;
+    try {
+      const parsed = JSON.parse(errorBody);
+      if (parsed.error?.message) detailMsg += ` - ${parsed.error.message}`;
+    } catch {}
     throw new OAuthCallbackError(
-      `Échec de l'échange du code d'autorisation auprès de ${network} (HTTP ${tokenRes?.status ?? 'réseau'}).`,
+      `Échec de l'échange du code d'autorisation auprès de ${network} (${detailMsg}).`,
     );
   }
 
