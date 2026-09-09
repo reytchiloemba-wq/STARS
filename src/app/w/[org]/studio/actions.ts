@@ -57,6 +57,23 @@ export async function saveDraftAction(
   }
 }
 
+export interface PublishTargetResult {
+  network: SocialNetwork;
+  accountName: string;
+  success: boolean;
+  externalPostId: string | null;
+  errorMessage: string | null;
+}
+
+export interface PublishOrScheduleResult {
+  ok: boolean;
+  publicationId?: string;
+  scheduled?: boolean;
+  /** One entry per selected account, whatever the outcome — always populated so the UI can show a precise per-network breakdown instead of one generic line. */
+  results?: PublishTargetResult[];
+  error?: string;
+}
+
 export async function publishOrScheduleAction(
   orgSlug: string,
   params: {
@@ -65,7 +82,7 @@ export async function publishOrScheduleAction(
     scheduledAt?: string;
     timezone?: string;
   },
-): Promise<{ ok: boolean; publicationId?: string; error?: string }> {
+): Promise<PublishOrScheduleResult> {
   try {
     const ctx = await requireTenantPermission(orgSlug, 'social.publish');
     const pub = await EditorialService.publishOrSchedule({
@@ -77,27 +94,41 @@ export async function publishOrScheduleAction(
       timezone: params.timezone,
     });
 
-    // publishOrSchedule can resolve without throwing even when every target
-    // failed (each connector call is caught individually so one account's
-    // failure doesn't abort the others) — inspect the real outcome here
-    // rather than assuming success whenever nothing threw.
-    if (pub.status === 'FAILED') {
-      const targets = await db.publicationTarget.findMany({
-        where: { publicationId: pub.id },
-        select: { status: true, errorMessage: true },
-      });
-      const reasons = targets
-        .filter((t) => t.status === 'FAILED')
-        .map((t) => t.errorMessage)
-        .filter((msg): msg is string => Boolean(msg));
+    const targets = await db.publicationTarget.findMany({
+      where: { publicationId: pub.id },
+      include: { socialAccount: { select: { network: true, displayName: true } } },
+    });
+
+    const results: PublishTargetResult[] = targets.map((t) => ({
+      network: t.socialAccount.network,
+      accountName: t.socialAccount.displayName,
+      success: t.status === 'PUBLISHED' || t.status === 'SCHEDULED',
+      externalPostId: t.externalPostId,
+      errorMessage: t.errorMessage,
+    }));
+
+    if (pub.status === 'SCHEDULED') {
+      return { ok: true, publicationId: pub.id, scheduled: true, results };
+    }
+
+    // publishOrSchedule can resolve without throwing even when every (or
+    // some) target failed — each connector call is caught individually so
+    // one account's failure doesn't abort the others. Report the real,
+    // per-account outcome rather than collapsing it into one generic
+    // success/failure line: a 2-out-of-3 partial success must never read
+    // as either "all published" or "all failed."
+    const anyFailed = results.some((r) => !r.success);
+    if (anyFailed) {
+      const reasons = results.filter((r) => !r.success).map((r) => `${r.accountName} : ${r.errorMessage ?? 'échec inconnu'}`);
       return {
-        ok: false,
+        ok: results.some((r) => r.success), // true = at least a partial success, still worth surfacing as such
         publicationId: pub.id,
-        error: reasons.length > 0 ? reasons.join(' · ') : 'La publication a échoué sur tous les comptes sélectionnés.',
+        results,
+        error: reasons.join(' · '),
       };
     }
 
-    return { ok: true, publicationId: pub.id };
+    return { ok: true, publicationId: pub.id, results };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Erreur de publication' };
   }

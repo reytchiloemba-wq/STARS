@@ -2,7 +2,13 @@
 
 import { useState, useTransition } from 'react';
 import type { SocialNetwork, BrandVoice, SocialAccount, Draft } from '@prisma/client';
-import { generateVariantsAction, saveDraftAction, publishOrScheduleAction, attachIllustrationAction } from './actions';
+import {
+  generateVariantsAction,
+  saveDraftAction,
+  publishOrScheduleAction,
+  attachIllustrationAction,
+  type PublishTargetResult,
+} from './actions';
 import type { PostVariantItem } from '@/server/services/editorial.service';
 import NetworkPreview from '@/components/editorial/network-preview';
 import IllustrationStudio, { type SelectedMedia } from '@/components/editorial/illustration-studio';
@@ -72,6 +78,7 @@ export default function StudioClient({
 
   const [savedDraftId, setSavedDraftId] = useState<string | null>(initialDraft?.id ?? null);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [publishResults, setPublishResults] = useState<PublishTargetResult[] | null>(null);
   const [isPending, startTransition] = useTransition();
 
   // Modal de programmation / publication
@@ -204,13 +211,22 @@ export default function StudioClient({
       // unchanged, and the real error banner was rendering invisibly behind
       // it — exactly "rien ne s'affiche" (nothing shows up).
       setShowPublishModal(false);
-      if (res.ok) {
+      setPublishResults(res.results ?? null);
+
+      if (res.scheduled) {
+        setStatusMessage({ type: 'success', text: 'Publication programmée dans le calendrier éditorial !' });
+        return;
+      }
+
+      const successCount = res.results?.filter((r) => r.success).length ?? 0;
+      const totalCount = res.results?.length ?? 0;
+
+      if (res.ok && totalCount > 0 && successCount === totalCount) {
+        setStatusMessage({ type: 'success', text: `Publiée avec succès sur ${successCount} compte(s).` });
+      } else if (successCount > 0 && successCount < totalCount) {
         setStatusMessage({
-          type: 'success',
-          text:
-            wantsToSchedule && scheduleDate
-              ? 'Publication programmée dans le calendrier éditorial !'
-              : 'Publication transmise avec succès aux réseaux sélectionnés.',
+          type: 'error',
+          text: `Publication partielle : ${successCount}/${totalCount} compte(s) réussi(s), le détail est ci-dessous.`,
         });
       } else {
         setStatusMessage({ type: 'error', text: res.error || 'Échec de la publication.' });
@@ -228,7 +244,25 @@ export default function StudioClient({
               : 'border-danger/40 bg-danger/10 text-danger'
           }`}
         >
-          {statusMessage.text}
+          <p>{statusMessage.text}</p>
+
+          {publishResults && publishResults.length > 0 && (
+            <ul className="mt-3 space-y-1.5 border-t border-current/20 pt-3 text-xs font-normal">
+              {publishResults.map((r, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className={r.success ? 'text-success' : 'text-danger'}>{r.success ? '✅' : '❌'}</span>
+                  <span className="text-foreground">
+                    <strong>{r.network}</strong> — {r.accountName} :{' '}
+                    {r.success
+                      ? r.externalPostId
+                        ? `publié (ID : ${r.externalPostId})`
+                        : 'programmé'
+                      : r.errorMessage || 'échec inconnu'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
@@ -459,7 +493,11 @@ export default function StudioClient({
 
               <button
                 type="button"
-                onClick={() => setShowPublishModal(true)}
+                onClick={() => {
+                  setStatusMessage(null);
+                  setPublishResults(null);
+                  setShowPublishModal(true);
+                }}
                 disabled={isPending || !editedContent.trim()}
                 className="flex items-center gap-1.5 rounded-xl bg-start-gradient px-5 py-2.5 text-xs font-bold text-white shadow transition hover:opacity-90 disabled:opacity-50"
               >
