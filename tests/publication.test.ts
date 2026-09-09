@@ -13,6 +13,7 @@ interface FakeDraft {
   organizationId: string;
   currentContent: string;
   status: string;
+  network: string;
 }
 interface FakeAccount {
   id: string;
@@ -77,10 +78,15 @@ vi.mock('@/lib/db', () => ({
       }),
     },
     socialAccount: {
-      findMany: vi.fn(async ({ where }: { where: { id: { in: string[] }; organizationId: string; status: string } }) =>
-        accounts.filter(
-          (a) => where.id.in.includes(a.id) && a.organizationId === where.organizationId && a.status === where.status,
-        ),
+      findMany: vi.fn(
+        async ({ where }: { where: { id: { in: string[] }; organizationId: string; status: string; network: string } }) =>
+          accounts.filter(
+            (a) =>
+              where.id.in.includes(a.id) &&
+              a.organizationId === where.organizationId &&
+              a.status === where.status &&
+              a.network === where.network,
+          ),
       ),
     },
     publication: {
@@ -155,7 +161,7 @@ vi.mock('@/lib/db', () => ({
 const { EditorialService } = await import('@/server/services/editorial.service');
 
 beforeEach(() => {
-  drafts = [{ id: 'draft-1', organizationId: 'org-a', currentContent: 'Hello world', status: 'DRAFT' }];
+  drafts = [{ id: 'draft-1', organizationId: 'org-a', currentContent: 'Hello world', status: 'DRAFT', network: 'X' }];
   accounts = [
     { id: 'acc-1', organizationId: 'org-a', network: 'X', externalId: 'ext-1', accessTokenEnc: 'enc-1', status: 'ACTIVE' },
   ];
@@ -254,5 +260,41 @@ describe('EditorialService.publishOrSchedule — no fabricated success (audit re
       }),
     ).rejects.toThrow(/Aucun compte social actif/);
     expect(connectorPublish).not.toHaveBeenCalled();
+  });
+
+  it("CRITICAL: never delivers to an account on a different network than the draft's own — a tenant choosing a LinkedIn-formatted post must not be able to accidentally target a connected Facebook account", async () => {
+    // draft-1 is 'X' (see beforeEach); acc-fb is a real, ACTIVE, same-org
+    // account, just on the wrong network for this content.
+    accounts.push({ id: 'acc-fb', organizationId: 'org-a', network: 'FACEBOOK', externalId: 'fb-1', accessTokenEnc: 'enc-fb', status: 'ACTIVE' });
+
+    await expect(
+      EditorialService.publishOrSchedule({
+        organizationId: 'org-a',
+        userId: 'user-1',
+        draftId: 'draft-1',
+        socialAccountIds: ['acc-fb'],
+      }),
+    ).rejects.toThrow(/Aucun compte social actif/);
+    expect(connectorPublish).not.toHaveBeenCalled();
+  });
+
+  it('delivers only to the matching-network account when both matching and mismatched accounts are requested together', async () => {
+    accounts.push(
+      { id: 'acc-x-2', organizationId: 'org-a', network: 'X', externalId: 'ext-x2', accessTokenEnc: 'enc-x2', status: 'ACTIVE' },
+      { id: 'acc-fb-2', organizationId: 'org-a', network: 'FACEBOOK', externalId: 'fb-2', accessTokenEnc: 'enc-fb2', status: 'ACTIVE' },
+    );
+    connectorPublish.mockResolvedValue({ success: true, externalPostId: 'post-x' });
+
+    const pub = await EditorialService.publishOrSchedule({
+      organizationId: 'org-a',
+      userId: 'user-1',
+      draftId: 'draft-1', // network: X
+      socialAccountIds: ['acc-x-2', 'acc-fb-2'],
+    });
+
+    expect(pub.status).toBe('PUBLISHED');
+    expect(connectorPublish).toHaveBeenCalledTimes(1); // only the X account, never the Facebook one
+    expect(targets).toHaveLength(1);
+    expect(targets[0]?.socialAccountId).toBe('acc-x-2');
   });
 });

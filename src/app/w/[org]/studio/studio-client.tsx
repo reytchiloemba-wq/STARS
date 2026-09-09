@@ -743,13 +743,18 @@ export default function StudioClient({
                 <label className="text-xs font-bold text-white uppercase tracking-wider">
                   Comptes cibles ({activeSpec.name}) :
                 </label>
-                {socialAccounts.length === 0 ? (
+                {connectedForNetwork.length === 0 ? (
                   <div className="mt-2 rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
-                    Aucun compte officiel connecté pour {activeSpec.name}. Une publication en mode simulation d&apos;environnement sera enregistrée.
+                    Aucun compte {activeSpec.name} actif connecté. Connectez-en un dans Paramètres → Réseaux sociaux
+                    avant de publier.
                   </div>
                 ) : (
                   <div className="mt-2 space-y-2">
-                    {socialAccounts.map((acc) => (
+                    {/* Only accounts for the network this post was written for — a LinkedIn-formatted
+                        post (character limit, tone) must never be offered to a Facebook/X/Instagram
+                        account by mistake. Each tenant picks among their OWN connected accounts for
+                        this network only (already tenant-scoped via the `socialAccounts` prop). */}
+                    {connectedForNetwork.map((acc) => (
                       <label
                         key={acc.id}
                         className={`flex items-center justify-between rounded-xl border p-3 text-xs cursor-pointer transition ${

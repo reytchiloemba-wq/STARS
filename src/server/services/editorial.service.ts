@@ -335,6 +335,13 @@ export class EditorialService {
         id: { in: params.socialAccountIds },
         organizationId: params.organizationId,
         status: 'ACTIVE',
+        // Never trust the client to only send accounts matching the
+        // draft's own network — a LinkedIn-formatted draft (character
+        // limit, tone, hashtag conventions) must never be delivered to a
+        // Facebook/X/Instagram account, whatever the request claims. The
+        // Studio UI already only offers same-network accounts, but this is
+        // the actual enforcement point.
+        network: draft.network,
       },
     });
     if (accounts.length === 0) {
