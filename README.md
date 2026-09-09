@@ -160,6 +160,59 @@ for the whole platform — tenants never see this page or its credentials
   properties (encryption round-trip/tamper detection, access control,
   CSRF/replay/expiry) independently of any live provider.
 
+## Audit findings and fixes (2026-09-09) — scheduled publications had no executor
+
+Reported symptom: "nothing shows up on social networks after publishing,"
+even after the connector fixes below were already deployed.
+
+- **CRITICAL — `Publication.status = 'SCHEDULED'` was a dead end.** Nothing
+  in the codebase ever transitioned a scheduled publication forward — no
+  cron, no worker, nothing. Once scheduled, a publication sat there
+  permanently and was never actually delivered. Compounded by a **UX bug**:
+  the schedule datetime-local field defaulted to visually empty but a
+  single stray interaction (even just clicking its spinner arrows) could
+  fire `onChange` with the current time, silently arming "schedule" mode —
+  live production data showed every recent publish attempt landing within
+  seconds of "now" as its `runAt`, which is what a mis-click produces, not
+  a deliberate future date. Every publish was silently being scheduled for
+  a time that had basically already passed, and then never executed.
+  Fixed:
+  - `EditorialService.executeDueSchedules()` — a real worker that finds
+    every `Schedule` whose `runAt` has passed and whose `Publication` is
+    still `SCHEDULED`, and delivers it through the exact same
+    `attemptDelivery()` path as an immediate publish (extracted as shared
+    code, so scheduled and immediate delivery can't drift out of sync).
+    Idempotent against a double trigger (claims the row via a conditional
+    `SCHEDULED -> PUBLISHING` update before delivering).
+  - `src/app/api/cron/publish-scheduled/route.ts` + `vercel.json` — a
+    Vercel Cron job (every 5 minutes; Hobby plan limits cron to once/day,
+    see `.env.example`) that calls it, protected by `CRON_SECRET`.
+  - Studio UI: scheduling is now an explicit checkbox
+    ("Programmer pour plus tard") gating the datetime field, instead of
+    inferring intent from whether the field happens to be non-empty.
+  - **Ran the worker once manually against the live backlog** to unstick
+    existing stuck publications — this had a real, public effect: 6 posts
+    with demo/placeholder text went live on the connected Facebook Page
+    (proving the full OAuth → encryption → real Graph API pipeline works
+    end-to-end), and 2 X (Twitter) posts failed with a genuine X API error
+    ("Authenticating with OAuth 2.0 Application-Only is forbidden... ")
+    indicating the connected X Developer app's *User authentication
+    settings* likely need to be enabled/reconfigured in the X Developer
+    Portal for OAuth 2.0 user-context auth — not something fixable from
+    application code.
+  - `tests/scheduled-publications.test.ts` (4 tests) covers: real delivery
+    on a due schedule, ignoring not-yet-due schedules, never re-delivering
+    an already-processed publication, and recording a genuine failure
+    honestly.
+- Follow-on fix to the prior "modal hides errors" fix: the publish modal
+  now always closes after the attempt (success or failure) — the earlier
+  fix already did this, but this pass also fixed a bug it introduced in
+  `attemptDelivery`'s refactor (it used `updateMany` assuming a
+  `PublicationTarget` row already existed, which is only true on the
+  scheduled path — the immediate-publish path never pre-creates one, so
+  every immediate publish attempt was silently a no-op update. Fixed with
+  `upsert`, covered by the existing `tests/publication.test.ts`).
+
 ## Audit findings and fixes (2026-09-08)
 
 A full audit focused on the publication pipeline found and fixed a critical

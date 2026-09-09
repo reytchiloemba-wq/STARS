@@ -354,10 +354,10 @@ export class EditorialService {
     });
 
     if (isScheduled && params.scheduledAt) {
-      // Actual delivery for a scheduled post requires a background worker
-      // (not built yet — see README known limitations) that would call the
-      // same connectors below when `runAt` arrives. Only the schedule record
-      // is created here; nothing is claimed as published.
+      // Actual delivery happens later, when a Vercel Cron job hits
+      // /api/cron/publish-scheduled and calls executeDueSchedules() below —
+      // see that route and vercel.json. Only the schedule record is created
+      // here; nothing is claimed as published yet.
       for (const acc of accounts) {
         await db.publicationTarget.create({
           data: { publicationId: publication.id, socialAccountId: acc.id, status: 'SCHEDULED' },
@@ -375,9 +375,27 @@ export class EditorialService {
       return publication;
     }
 
-    // Immediate publish: call the real connector for each account and
-    // record its actual result — one account's failure never contaminates
-    // another's, and none of this is ever inferred without a real API call.
+    const succeeded = await EditorialService.attemptDelivery(publication.id, accounts, draft.currentContent ?? '', idempotencyKey);
+    await db.draft.update({ where: { id: draft.id }, data: { status: succeeded ? 'PUBLISHED' : 'FAILED' } });
+
+    return db.publication.findUniqueOrThrow({ where: { id: publication.id } });
+  }
+
+  /**
+   * Calls the real connector for each account and records the ACTUAL
+   * result — one account's failure never contaminates another's, and
+   * nothing here is ever inferred without a genuine API call. Shared by
+   * the immediate-publish path above and executeDueSchedules() below, so
+   * a scheduled publication is delivered through the exact same code path
+   * as an immediate one — no separate, divergent "scheduled delivery"
+   * logic to drift out of sync.
+   */
+  private static async attemptDelivery(
+    publicationId: string,
+    accounts: { id: string; network: SocialNetwork; externalId: string; accessTokenEnc: string; organizationId: string }[],
+    content: string,
+    idempotencyKey: string,
+  ): Promise<boolean> {
     let allSucceeded = true;
     for (const acc of accounts) {
       let accessToken: string;
@@ -385,10 +403,18 @@ export class EditorialService {
         accessToken = decryptSecret(acc.accessTokenEnc);
       } catch {
         allSucceeded = false;
-        await db.publicationTarget.create({
-          data: {
-            publicationId: publication.id,
+        // upsert, not update: the immediate-publish caller has NOT
+        // pre-created a target row (only the scheduled path does, when it
+        // first queues the SCHEDULED row) — this must work for both.
+        await db.publicationTarget.upsert({
+          where: { publicationId_socialAccountId: { publicationId, socialAccountId: acc.id } },
+          create: {
+            publicationId,
             socialAccountId: acc.id,
+            status: 'FAILED',
+            errorMessage: "Impossible de déchiffrer le jeton d'accès de ce compte — reconnectez-le.",
+          },
+          update: {
             status: 'FAILED',
             errorMessage: "Impossible de déchiffrer le jeton d'accès de ce compte — reconnectez-le.",
           },
@@ -398,33 +424,86 @@ export class EditorialService {
 
       const connector = getSocialConnector(acc.network);
       const result = await connector.publish({
-        organizationId: params.organizationId,
+        organizationId: acc.organizationId,
         socialAccountExternalId: acc.externalId,
         accessToken,
         network: acc.network,
-        content: draft.currentContent ?? '',
+        content,
         mediaUrls: [],
         idempotencyKey: `${idempotencyKey}-${acc.id}`,
       });
 
       if (!result.success) allSucceeded = false;
 
-      await db.publicationTarget.create({
-        data: {
-          publicationId: publication.id,
-          socialAccountId: acc.id,
-          status: result.success ? 'PUBLISHED' : 'FAILED',
-          externalPostId: result.success ? result.externalPostId : null,
-          errorMessage: result.success ? null : result.errorMessage,
-          publishedAt: result.success ? new Date() : null,
-        },
+      const targetData = {
+        status: result.success ? ('PUBLISHED' as const) : ('FAILED' as const),
+        externalPostId: result.success ? result.externalPostId : null,
+        errorMessage: result.success ? null : result.errorMessage,
+        publishedAt: result.success ? new Date() : null,
+      };
+      await db.publicationTarget.upsert({
+        where: { publicationId_socialAccountId: { publicationId, socialAccountId: acc.id } },
+        create: { publicationId, socialAccountId: acc.id, ...targetData },
+        update: targetData,
       });
     }
 
-    const finalStatus = allSucceeded ? 'PUBLISHED' : 'FAILED';
-    await db.publication.update({ where: { id: publication.id }, data: { status: finalStatus } });
-    await db.draft.update({ where: { id: draft.id }, data: { status: allSucceeded ? 'PUBLISHED' : 'FAILED' } });
+    await db.publication.update({
+      where: { id: publicationId },
+      data: { status: allSucceeded ? 'PUBLISHED' : 'FAILED' },
+    });
 
-    return db.publication.findUniqueOrThrow({ where: { id: publication.id } });
+    return allSucceeded;
+  }
+
+  /**
+   * The actual "worker" for scheduled publications — called by the Vercel
+   * Cron-triggered route (/api/cron/publish-scheduled), never by a user
+   * request. Finds every Schedule whose `runAt` has passed and whose
+   * Publication is still SCHEDULED (never already PUBLISHED/FAILED — that
+   * guard makes this safe to call more than once, e.g. if the cron fires
+   * again before the previous run's DB writes are visible), and delivers
+   * each one for real through attemptDelivery().
+   */
+  static async executeDueSchedules(): Promise<{ processed: number; published: number; failed: number }> {
+    const due = await db.schedule.findMany({
+      where: { runAt: { lte: new Date() }, publication: { status: 'SCHEDULED' } },
+      include: {
+        publication: {
+          include: {
+            draft: true,
+            targets: { include: { socialAccount: true } },
+          },
+        },
+      },
+    });
+
+    let published = 0;
+    let failed = 0;
+
+    for (const schedule of due) {
+      const pub = schedule.publication;
+      // Idempotency guard against a double cron trigger racing this loop:
+      // only proceed if we can flip SCHEDULED -> PUBLISHING ourselves.
+      const claimed = await db.publication.updateMany({
+        where: { id: pub.id, status: 'SCHEDULED' },
+        data: { status: 'PUBLISHING' },
+      });
+      if (claimed.count === 0) continue; // another worker run already claimed it
+
+      const accounts = pub.targets.map((t) => t.socialAccount);
+      const succeeded = await EditorialService.attemptDelivery(
+        pub.id,
+        accounts,
+        pub.draft.currentContent ?? '',
+        pub.idempotencyKey,
+      );
+      await db.draft.update({ where: { id: pub.draftId }, data: { status: succeeded ? 'PUBLISHED' : 'FAILED' } });
+
+      if (succeeded) published++;
+      else failed++;
+    }
+
+    return { processed: due.length, published, failed };
   }
 }

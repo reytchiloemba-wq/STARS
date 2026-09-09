@@ -80,6 +80,20 @@ export default function StudioClient({
     socialAccounts.filter((a) => a.network === network).map((a) => a.id),
   );
   const [scheduleDate, setScheduleDate] = useState<string>('');
+  // Explicit opt-in gate, separate from `scheduleDate` itself. Root cause
+  // of a real bug (found in production: every publish silently went
+  // through the never-actually-executed "scheduled" path instead of
+  // publishing immediately): a stray interaction with the datetime-local
+  // picker (a single click on its spinner arrows is enough on some
+  // browsers) fires onChange with the current time, silently arming
+  // "schedule" mode with no visible sign anything changed. Requiring this
+  // explicit checkbox means the date field only has any effect once the
+  // user has deliberately said they want to schedule.
+  const [wantsToSchedule, setWantsToSchedule] = useState(false);
+  // Computed once at mount (React's purity rule forbids calling Date.now()
+  // directly during render/JSX) — a lazy useState initializer is the
+  // sanctioned place for this.
+  const [minScheduleDate] = useState(() => new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16));
 
   function handleGenerateVariants() {
     if (!topicTitle.trim()) {
@@ -180,7 +194,7 @@ export default function StudioClient({
       const res = await publishOrScheduleAction(org, {
         draftId,
         socialAccountIds: selectedAccounts,
-        scheduledAt: scheduleDate ? new Date(scheduleDate).toISOString() : undefined,
+        scheduledAt: wantsToSchedule && scheduleDate ? new Date(scheduleDate).toISOString() : undefined,
       });
 
       // Always close the modal, success or failure — it's a full-screen
@@ -193,9 +207,10 @@ export default function StudioClient({
       if (res.ok) {
         setStatusMessage({
           type: 'success',
-          text: scheduleDate
-            ? 'Publication programmée dans le calendrier éditorial !'
-            : 'Publication transmise avec succès aux réseaux sélectionnés.',
+          text:
+            wantsToSchedule && scheduleDate
+              ? 'Publication programmée dans le calendrier éditorial !'
+              : 'Publication transmise avec succès aux réseaux sélectionnés.',
         });
       } else {
         setStatusMessage({ type: 'error', text: res.error || 'Échec de la publication.' });
@@ -553,17 +568,31 @@ export default function StudioClient({
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground">
-                  Date et heure de programmation (optionnel) :
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={wantsToSchedule}
+                    onChange={(e) => {
+                      setWantsToSchedule(e.target.checked);
+                      if (!e.target.checked) setScheduleDate('');
+                    }}
+                    className="rounded accent-accent-cyan"
+                  />
+                  Programmer pour plus tard au lieu de publier maintenant
                 </label>
-                <input
-                  type="datetime-local"
-                  value={scheduleDate}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-border bg-surface-raised p-2.5 text-xs text-foreground outline-none focus:border-accent-cyan"
-                />
+                {wantsToSchedule && (
+                  <input
+                    type="datetime-local"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    min={minScheduleDate}
+                    className="mt-2 w-full rounded-xl border border-border bg-surface-raised p-2.5 text-xs text-foreground outline-none focus:border-accent-cyan"
+                  />
+                )}
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Laissez vide pour publier immédiatement après confirmation.
+                  {wantsToSchedule
+                    ? 'Choisissez une date : la publication réelle est exécutée automatiquement à cette heure.'
+                    : 'Laissez décoché pour publier immédiatement après confirmation.'}
                 </p>
               </div>
 
@@ -591,7 +620,7 @@ export default function StudioClient({
               >
                 {isPending
                   ? 'Traitement en cours…'
-                  : scheduleDate
+                  : wantsToSchedule && scheduleDate
                   ? 'Confirmer la programmation'
                   : 'Confirmer la diffusion immédiate'}
               </button>

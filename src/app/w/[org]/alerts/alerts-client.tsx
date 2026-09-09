@@ -82,7 +82,8 @@ export default function AlertsClient({
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
           <h2 className="text-base font-bold text-foreground">🔔 Alertes prioritaires</h2>
           <p className="text-xs text-muted-foreground">
-            Recevez une notification dès qu&apos;un fait nouveau ou une rupture est corroboré par au moins 2 sources.
+            Définissez un mot-clé déclencheur. La notification automatique n&apos;est pas encore active (voir la note
+            ci-dessus).
           </p>
 
           <form onSubmit={handleCreateAlert} className="mt-4 flex flex-col gap-2">

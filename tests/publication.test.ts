@@ -112,6 +112,33 @@ vi.mock('@/lib/db', () => ({
         targets.push(t);
         return t;
       }),
+      upsert: vi.fn(
+        async ({
+          where,
+          create,
+          update,
+        }: {
+          where: { publicationId_socialAccountId: { publicationId: string; socialAccountId: string } };
+          create: FakeTargetCreateInput;
+          update: Partial<FakeTarget>;
+        }) => {
+          const { publicationId, socialAccountId } = where.publicationId_socialAccountId;
+          const existing = targets.find((t) => t.publicationId === publicationId && t.socialAccountId === socialAccountId);
+          if (existing) {
+            Object.assign(existing, update);
+            return existing;
+          }
+          const t: FakeTarget = {
+            id: `target-${nextId++}`,
+            externalPostId: null,
+            errorMessage: null,
+            publishedAt: null,
+            ...create,
+          };
+          targets.push(t);
+          return t;
+        },
+      ),
       findMany: vi.fn(async ({ where }: { where: { publicationId: string } }) =>
         targets.filter((t) => t.publicationId === where.publicationId),
       ),
