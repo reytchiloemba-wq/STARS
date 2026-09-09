@@ -1,0 +1,24 @@
+name: Publish scheduled posts
+
+on:
+  schedule:
+    # Every 5 minutes. Vercel's Hobby plan cron only allows once/day, so this
+    # workflow is the actual trigger for EditorialService.executeDueSchedules()
+    # in production; vercel.json's daily cron is kept only as a harmless backup.
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call publish-scheduled endpoint
+        run: |
+          status=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -X GET "https://stars-ap.com/api/cron/publish-scheduled" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "HTTP status: $status"
+          cat /tmp/response.txt
+          if [ "$status" -ge 300 ]; then
+            exit 1
+          fi
