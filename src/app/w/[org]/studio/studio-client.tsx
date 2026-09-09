@@ -183,8 +183,14 @@ export default function StudioClient({
         scheduledAt: scheduleDate ? new Date(scheduleDate).toISOString() : undefined,
       });
 
+      // Always close the modal, success or failure — it's a full-screen
+      // overlay (fixed inset-0 z-50) that sits ON TOP of the statusMessage
+      // banner below. Leaving it open on failure hid the error completely:
+      // the user would click "Confirmer", the modal would just sit there
+      // unchanged, and the real error banner was rendering invisibly behind
+      // it — exactly "rien ne s'affiche" (nothing shows up).
+      setShowPublishModal(false);
       if (res.ok) {
-        setShowPublishModal(false);
         setStatusMessage({
           type: 'success',
           text: scheduleDate
