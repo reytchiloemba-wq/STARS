@@ -163,7 +163,11 @@ describe('completeOAuthFlow — CSRF, replay, and expiry protection (spec §25 t
       consumedAt: null,
     });
 
-    global.fetch = vi.fn(async () => ({ ok: false, status: 400 })) as unknown as typeof fetch;
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      text: async () => JSON.stringify({ error: { message: 'invalid_grant' } }),
+    })) as unknown as typeof fetch;
 
     await expect(completeOAuthFlow('LINKEDIN', 'bad-code', 'valid-state-2')).rejects.toThrow(OAuthCallbackError);
     expect(socialAccounts).toHaveLength(0);

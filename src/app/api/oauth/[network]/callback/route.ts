@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { completeOAuthFlow, OAuthCallbackError, OAuthNotConfiguredError } from '@/server/services/oauth.service';
+import { completeOAuthFlow, logOAuthOutcome, OAuthCallbackError, OAuthNotConfiguredError } from '@/server/services/oauth.service';
 import { db } from '@/lib/db';
 import type { SocialNetwork } from '@prisma/client';
 
@@ -31,6 +31,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ network:
 
   let origin = getBaseUrl(req);
   let orgSlug: string | null = null;
+  let orgId: string | null = null;
 
   if (state) {
     try {
@@ -45,11 +46,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ network:
       }
       if (stateRow?.organization?.slug) {
         orgSlug = stateRow.organization.slug;
+        orgId = stateRow.organization.id;
       }
     } catch {}
   }
 
+  // Every outcome below is persisted to AuditLog (see oauth.service.ts) —
+  // a prior version only ever logged failures to console.error, which is
+  // only visible in the hosting provider's function logs, not queryable
+  // from the app. A report of "nothing happens after Facebook consent" was
+  // previously undiagnosable without shell access to the deployment.
   const errorRedirect = (msg: string) => {
+    void logOAuthOutcome({ organizationId: orgId, network, outcome: 'failed', message: msg });
     if (orgSlug) {
       return NextResponse.redirect(`${origin}/w/${orgSlug}/settings/social?error=${encodeURIComponent(msg)}`);
     }
@@ -66,6 +74,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ network:
   try {
     const { organizationId } = await completeOAuthFlow(network, code, state);
     const org = await db.organization.findUniqueOrThrow({ where: { id: organizationId } });
+    await logOAuthOutcome({ organizationId, network, outcome: 'connected', message: 'Connexion OAuth réussie.' });
     return NextResponse.redirect(`${origin}/w/${org.slug}/settings/social?connected=${rawNetwork.toLowerCase()}`);
   } catch (err) {
     if (err instanceof OAuthCallbackError || err instanceof OAuthNotConfiguredError) {

@@ -157,6 +157,33 @@ export class OAuthCallbackError extends Error {
 }
 
 /**
+ * Every prior failure here only ever reached `console.error` (Vercel
+ * function logs, not queryable from the app or this session) — a user
+ * reporting "nothing happens" was previously undiagnosable without shell
+ * access to the deployment. This persists the real outcome so it can be
+ * queried directly (`AuditLog` where action starts with 'social.oauth.').
+ */
+export async function logOAuthOutcome(params: {
+  organizationId: string | null;
+  network: SocialNetwork;
+  outcome: 'connected' | 'failed';
+  message: string;
+}) {
+  try {
+    await db.auditLog.create({
+      data: {
+        organizationId: params.organizationId,
+        action: `social.oauth.${params.outcome}`,
+        targetType: 'SocialAccount',
+        metadata: { network: params.network, message: params.message },
+      },
+    });
+  } catch (err) {
+    console.error('[OAuth] Failed to write audit log entry:', err);
+  }
+}
+
+/**
  * Step 2 — the callback. Every failure mode here maps to a spec §25/§9
  * requirement: an unknown/expired/reused `state` is rejected (CSRF/replay
  * protection), and a real token exchange is performed against the provider —
