@@ -29,20 +29,46 @@ export default async function StudioPage({
   ]);
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+    <div className="space-y-6">
+      {/* En-tête exécutif du Studio */}
+      <div className="flex flex-col justify-between gap-4 border-b border-border/60 pb-5 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Studio Éditorial STARS</h1>
-          <p className="text-sm text-muted-foreground">
-            Transformez votre analyse en une prise de parole percutante, adaptée à votre audience et à chaque réseau.
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-cyan/30 bg-accent-cyan/10 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wider text-accent-cyan shadow-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent-cyan animate-pulse"></span>
+              STARS AI Studio
+            </span>
+            <span className="rounded-full border border-border bg-surface-raised px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+              Workspace : <strong className="text-foreground">{ctx.organization.name}</strong>
+            </span>
+            <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-0.5 text-[11px] font-medium text-success">
+              {socialAccounts.filter(a => a.status === 'ACTIVE').length} canal(aux) actif(s)
+            </span>
+          </div>
+          <h1 className="mt-2 font-display text-2xl font-black tracking-tight text-white sm:text-3xl">
+            Studio Éditorial & Diffusion
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+            Concevez, affinez et diffusez des prises de parole à fort impact, calibrées pour chaque réseau et conformes à votre charte.
           </p>
         </div>
-        <a
-          href={`/w/${org}/drafts`}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-accent-cyan hover:underline"
-        >
-          📂 Voir tous mes brouillons & approbations →
-        </a>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <a
+            href={`/w/${org}/calendar`}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised/80 px-3.5 py-2 text-xs font-semibold text-muted-foreground shadow-sm transition hover:border-border/80 hover:text-white"
+          >
+            <span>📅</span>
+            <span>Calendrier</span>
+          </a>
+          <a
+            href={`/w/${org}/drafts`}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-accent-cyan/40 bg-accent-cyan/10 px-3.5 py-2 text-xs font-semibold text-accent-cyan shadow-sm transition hover:bg-accent-cyan/20"
+          >
+            <span>📂</span>
+            <span>Brouillons & Archives</span>
+          </a>
+        </div>
       </div>
 
       <StudioClient
