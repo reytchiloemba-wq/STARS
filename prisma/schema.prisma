@@ -39,6 +39,10 @@ model User {
   searchSessions SearchSession[]
   consents       Consent[]
   rotatedSecrets SecretVersion[]
+  assignedComments SocialComment[] @relation("CommentAssignee")
+  authoredCommentReplies SocialComment[] @relation("CommentReplyAuthor")
+  commentNotes   SocialCommentNote[]
+  commentAudits  SocialCommentAudit[]
 }
 
 // A tenant. Every piece of tenant-owned data below references this id.
@@ -95,6 +99,9 @@ model Organization {
   makeExecutions     MakeExecution[]
   budgetPolicy       BudgetPolicy?
   technicalCosts     TechnicalCost[]
+  socialComments     SocialComment[]
+  crisisIncidents    CrisisIncident[]
+  moderationRules    ModerationRule[]
 }
 
 enum OrgStatus {
@@ -913,6 +920,7 @@ model SocialAccount {
   organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   brand              Brand?              @relation(fields: [brandId], references: [id])
   publicationTargets PublicationTarget[]
+  socialComments     SocialComment[]
 
   @@unique([organizationId, network, externalId])
   @@index([organizationId])
@@ -937,6 +945,7 @@ model Publication {
   draft        Draft               @relation(fields: [draftId], references: [id])
   targets      PublicationTarget[]
   schedule     Schedule?
+  socialComments SocialComment[]
 
   @@index([organizationId])
 }
@@ -1277,6 +1286,11 @@ enum WorkflowType {
   BRIEFING
   NOTIFICATION
   ANALYTICS
+  COMMENT_SYNC
+  COMMENT_QUALIFICATION
+  COMMENT_REPLY_SUGGESTION
+  CRISIS_ALERT
+  COMMENT_PUBLISH_REPLY
 }
 
 enum OrchestrationMode {
@@ -1408,4 +1422,210 @@ model BudgetPolicy {
 
   organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
+
+// =============================================================================
+// STARS COMMENT INTELLIGENCE HUB (Multi-Tenant Social Inbox & Governance)
+// =============================================================================
+
+enum CommentSentiment {
+  POSITIVE
+  RATHER_POSITIVE
+  NEUTRAL
+  MIXED
+  RATHER_NEGATIVE
+  NEGATIVE
+  UNDETERMINED
+}
+
+enum CommentCategory {
+  QUESTION
+  INFO_REQUEST
+  COMPLIMENT
+  TESTIMONIAL
+  OBJECTION
+  CRITICISM
+  COMPLAINT
+  SUPPORT_REQUEST
+  BUYING_INTENT
+  LEAD
+  PARTNERSHIP
+  JOB_APPLICATION
+  MEDIA_REQUEST
+  SUGGESTION
+  DEBATE
+  DISINFORMATION_RISK
+  SPAM
+  ABUSIVE
+  THREAT
+  LEGAL_RISK
+  REPUTATION_CRISIS
+  OTHER
+}
+
+enum CommentPriorityLevel {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum CommentStatus {
+  NEW
+  ANALYZED
+  TO_QUALIFY
+  ASSIGNED
+  REPLY_PREPARING
+  VALIDATION_REQUIRED
+  READY_TO_REPLY
+  REPLIED
+  WAITING_ON_CONTACT
+  ESCALATED
+  HIDDEN
+  DELETED
+  SPAM
+  NO_REPLY_NEEDED
+  CLOSED
+  REOPENED
+}
+
+enum TeamQueue {
+  COMMUNITY
+  SUPPORT
+  SALES
+  LEGAL
+  PR
+  CRISIS
+}
+
+model SocialComment {
+  id                  String               @id @default(cuid())
+  organizationId      String
+  socialAccountId     String?
+  publicationId       String?
+  parentCommentId     String?
+  platform            SocialNetwork
+  externalCommentId   String
+  externalPostId      String?
+  externalAuthorId    String?
+  authorName          String
+  authorUsername      String?
+  authorAvatarUrl     String?
+  content             String
+  publishedAt         DateTime
+  sentiment           CommentSentiment     @default(NEUTRAL)
+  category            CommentCategory      @default(OTHER)
+  categoryConfidence  Float                @default(0.85)
+  categoryReason      String?
+  priorityScore       Int                  @default(50) // 0-100
+  priorityLevel       CommentPriorityLevel @default(NORMAL)
+  priorityFactors     Json?
+  status              CommentStatus        @default(NEW)
+  assignedUserId      String?
+  assignedTeam        TeamQueue            @default(COMMUNITY)
+  slaDueAt            DateTime?
+  slaBreached         Boolean              @default(false)
+  isSensitive         Boolean              @default(false)
+  repliedAt           DateTime?
+  replyContent        String?
+  replyAuthorId       String?
+  convertedToType     String?              // 'LEAD' | 'SUPPORT_TICKET' | 'TASK' | 'CONTENT_IDEA' | 'PUBLICATION'
+  convertedTargetId   String?
+  postContextSummary  String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  socialAccount       SocialAccount?       @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  publication         Publication?         @relation(fields: [publicationId], references: [id], onDelete: SetNull)
+  parentComment       SocialComment?       @relation("CommentThread", fields: [parentCommentId], references: [id], onDelete: SetNull)
+  replies             SocialComment[]      @relation("CommentThread")
+  assignedUser        User?                @relation("CommentAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  replyAuthor         User?                @relation("CommentReplyAuthor", fields: [replyAuthorId], references: [id], onDelete: SetNull)
+  internalNotes       SocialCommentNote[]
+  suggestions         SocialCommentSuggestion[]
+  auditLogs           SocialCommentAudit[]
+
+  @@unique([organizationId, platform, externalCommentId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([priorityLevel])
+  @@index([platform])
+  @@index([publishedAt])
+}
+
+model SocialCommentNote {
+  id              String        @id @default(cuid())
+  commentId       String
+  authorId        String
+  body            String
+  createdAt       DateTime      @default(now())
+
+  comment         SocialComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  author          User          @relation(fields: [authorId], references: [id])
+
+  @@index([commentId])
+}
+
+model SocialCommentSuggestion {
+  id              String        @id @default(cuid())
+  commentId       String
+  variantKey      String        // 'short' | 'expert' | 'commercial' | 'educational' | 'empathic' | 'factual' | 'deescalation' | 'private' | 'no_reply'
+  label           String
+  suggestedReply  String
+  tone            String?
+  isAccepted      Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+
+  comment         SocialComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
+}
+
+model SocialCommentAudit {
+  id              String        @id @default(cuid())
+  commentId       String
+  actorUserId     String?
+  fromStatus      CommentStatus?
+  toStatus        CommentStatus
+  reason          String?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+
+  comment         SocialComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  actor           User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([commentId])
+}
+
+model CrisisIncident {
+  id              String           @id @default(cuid())
+  organizationId  String
+  title           String
+  severity        IncidentSeverity @default(WARNING)
+  status          String           @default("ACTIVE") // ACTIVE | RESOLVED | FALSE_ALARM
+  description     String
+  signalsDetected Json?
+  detectedAt      DateTime         @default(now())
+  resolvedAt      DateTime?
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model ModerationRule {
+  id              String        @id @default(cuid())
+  organizationId  String
+  name            String
+  ruleType        String        // KEYWORD_BLOCK | AUTO_HIDE | AUTO_FLAG_CRISIS | SPAM_FILTER
+  pattern         String
+  action          String        // HIDE | FLAG_CRITICAL | ESCALATE_LEGAL | MARK_SPAM
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
 

@@ -37,6 +37,12 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    title: 'Engagement & Communauté',
+    items: [
+      { href: 'comments', label: 'Comment Intelligence', icon: '💬' },
+    ],
+  },
+  {
     title: 'Stratégie & Impact',
     items: [
       { href: 'brand-voice', label: 'Brand Voice Studio', icon: '🎙️' },
