@@ -60,10 +60,37 @@ export default async function BillingPage({
         <StatCard label="Statut" value={subscription?.status ?? 'TRIAL'} />
         <StatCard label="Membres" value={`${memberCount} / ${plan.quotas.seatsIncluded === -1 ? '∞' : plan.quotas.seatsIncluded}`} />
         <StatCard
-          label="Crédits STARS"
-          value={`${balance} / ${plan.quotas.creditsPerMonth === -1 ? '∞' : plan.quotas.creditsPerMonth}`}
+          label="Solde STARS Intelligence Credits (SIC)"
+          value={`${balance} SIC ${plan.quotas.creditsPerMonth === -1 ? '(Illimité)' : `/ ${plan.quotas.creditsPerMonth}`}`}
         />
       </section>
+
+      {/* SIC Health Gauge */}
+      {plan.quotas.creditsPerMonth > 0 && (
+        <section className="rounded-2xl border border-border/70 bg-surface p-5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-foreground">Consommation des crédits SIC pour la période en cours</span>
+            <span className="font-mono font-bold text-accent-cyan">{balance} SIC disponibles</span>
+          </div>
+          <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-surface-raised">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                balance / plan.quotas.creditsPerMonth <= 0.1
+                  ? 'bg-danger'
+                  : balance / plan.quotas.creditsPerMonth <= 0.25
+                    ? 'bg-warning'
+                    : 'bg-start-gradient'
+              }`}
+              style={{ width: `${Math.min(100, Math.max(5, (balance / plan.quotas.creditsPerMonth) * 100))}%` }}
+            />
+          </div>
+          {balance <= plan.quotas.creditsPerMonth * 0.2 && (
+            <p className="mt-2 text-xs font-medium text-warning">
+              ⚠️ Votre solde de crédits SIC est bas ({balance} SIC restants). Rechargez un pack ci-dessous pour éviter toute interruption d’analyse.
+            </p>
+          )}
+        </section>
+      )}
 
       {!billingConfigured && (
         <p className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
