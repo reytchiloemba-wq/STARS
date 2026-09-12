@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireSuperAdmin } from '@/lib/super-admin';
-import { saveMakeConfiguration, updateScenario, testMakeScenario } from '@/server/services/make/admin.service';
+import { saveMakeConfiguration, updateScenario, testMakeScenario, revokeMakeApiToken } from '@/server/services/make/admin.service';
 import type { OrchestrationMode } from '@/server/services/make/types';
 
 export async function saveMakeConfigAction(formData: FormData) {
@@ -53,4 +53,11 @@ export async function testScenarioAction(id: string) {
   const result = await testMakeScenario(id);
   revalidatePath('/admin/infrastructure/make');
   return result;
+}
+
+export async function revokeMakeTokenAction() {
+  await requireSuperAdmin();
+  await revokeMakeApiToken();
+  revalidatePath('/admin/infrastructure/make');
+  return { success: true };
 }

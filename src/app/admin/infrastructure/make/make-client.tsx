@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { saveMakeConfigAction, updateScenarioAction, testScenarioAction } from './actions';
+import { saveMakeConfigAction, updateScenarioAction, testScenarioAction, revokeMakeTokenAction } from './actions';
 import { MAKE_SCENARIO_BLUEPRINTS } from '@/server/services/make/blueprints';
 import type { WorkflowType, OrchestrationMode } from '@/server/services/make/types';
 
@@ -179,12 +179,28 @@ export default function MakeClient({ overview }: MakeClientProps) {
             <label className="block text-xs font-medium text-muted-foreground">
               API Token Make {overview.config.apiTokenFingerprint && `(Actuel: ${overview.config.apiTokenFingerprint})`}
             </label>
-            <input
-              type="password"
-              name="apiToken"
-              placeholder={overview.config.apiTokenFingerprint ? 'Laisser vide pour ne pas modifier' : 'Token Make v2'}
-              className="mt-1.5 w-full rounded-xl border border-border bg-surface-raised px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-accent-cyan focus:outline-none"
-            />
+            <div className="mt-1.5 flex gap-2">
+              <input
+                type="password"
+                name="apiToken"
+                placeholder={overview.config.apiTokenFingerprint ? 'Laisser vide pour ne pas modifier' : 'Token Make v2'}
+                className="w-full rounded-xl border border-border bg-surface-raised px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-accent-cyan focus:outline-none"
+              />
+              {overview.config.apiTokenFingerprint && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!confirm('Révoquer le token API Make actuel ? STARS ne pourra plus appeler l’API Make tant qu’un nouveau token n’est pas enregistré.')) return;
+                    await revokeMakeTokenAction();
+                    setSaveMessage('Token API Make révoqué.');
+                    setTimeout(() => setSaveMessage(null), 4000);
+                  }}
+                  className="shrink-0 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs font-semibold text-danger hover:bg-danger/20 transition-colors"
+                >
+                  Révoquer
+                </button>
+              )}
+            </div>
           </div>
 
           <div>

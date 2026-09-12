@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   PLANS,
-  FOUNDERS_PROMO,
   CREDIT_COSTS,
   CREDIT_PACKS,
   formatPriceCents,
@@ -12,8 +11,10 @@ import {
   VAT_NOTE,
   type PlanKey,
 } from '@/config/pricing';
+import type { PromoCampaignView } from '@/server/services/promo.service';
+import PricingComparator from './pricing-comparator';
 
-export default function LandingPricing() {
+export default function LandingPricing({ foundersPromo }: { foundersPromo: PromoCampaignView }) {
   const [cycle, setCycle] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
   const [seatsByPlan, setSeatsByPlan] = useState<Record<PlanKey, number>>({
     discovery: 1,
@@ -95,7 +96,7 @@ export default function LandingPricing() {
         {PLANS.map((plan) => {
           const isPopular = plan.highlight === 'most-popular';
           const price = cycle === 'ANNUAL' ? plan.annualPriceCents : plan.monthlyPriceCents;
-          const foundersEligible = FOUNDERS_PROMO.enabled && FOUNDERS_PROMO.eligiblePlans.includes(plan.key);
+          const foundersEligible = foundersPromo.enabled && foundersPromo.eligiblePlans.includes(plan.key);
           const seats = seatsByPlan[plan.key];
           const extraSeats = Math.max(0, seats - plan.quotas.seatsIncluded);
           const extraSeatsCost =
@@ -119,7 +120,7 @@ export default function LandingPricing() {
                     </span>
                   )}
                   {foundersEligible && (
-                    <span className="demo-badge text-[10px]">{FOUNDERS_PROMO.badge}</span>
+                    <span className="demo-badge text-[10px]">{foundersPromo.badge}</span>
                   )}
                 </div>
 
@@ -146,7 +147,10 @@ export default function LandingPricing() {
                   </div>
                   {foundersEligible && totalCents !== null && totalCents > 0 && (
                     <p className="mt-1 text-[11px] font-medium text-success">
-                      -{FOUNDERS_PROMO.discountPercent}% pdt {FOUNDERS_PROMO.durationMonths} mois
+                      -{foundersPromo.discountPercent}% pdt {foundersPromo.durationMonths} mois
+                      {foundersPromo.remainingRedemptions !== null && (
+                        <> · {foundersPromo.remainingRedemptions} places restantes</>
+                      )}
                     </p>
                   )}
                   {cycle === 'ANNUAL' && plan.annualPriceCents !== null && plan.annualPriceCents > 0 && (
@@ -208,6 +212,8 @@ export default function LandingPricing() {
       </div>
 
       <p className="mt-10 text-center text-xs text-muted-foreground">{VAT_NOTE}</p>
+
+      <PricingComparator />
 
       {/* SIC Educational Banner */}
       <div className="mt-20 rounded-3xl border border-border/80 bg-gradient-to-br from-surface to-surface-raised p-8 shadow-xl sm:p-10">

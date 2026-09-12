@@ -13,6 +13,12 @@ import Faq from '@/components/landing/faq';
 import FinalCta from '@/components/landing/final-cta';
 import LandingFooter from '@/components/landing/footer';
 import { PLANS } from '@/config/pricing';
+import { getFoundersPromo } from '@/server/services/promo.service';
+
+// The Founders promo is administrable from the Super Admin without a
+// redeploy (see promo.service.ts) — revalidate periodically instead of
+// caching this page indefinitely at build time.
+export const revalidate = 60;
 import { FAQ_ITEMS } from '@/config/faq';
 
 export const metadata: Metadata = {
@@ -65,7 +71,9 @@ function jsonLd() {
   };
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const foundersPromo = await getFoundersPromo();
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd()) }} />
@@ -77,7 +85,7 @@ export default function HomePage() {
       <ContradictionShowcase />
       <EditorialStudioShowcase />
       <AudiencesAndDifferentiators />
-      <LandingPricing />
+      <LandingPricing foundersPromo={foundersPromo} />
       <Security />
       <Faq />
       <FinalCta />

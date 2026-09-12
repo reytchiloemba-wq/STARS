@@ -173,6 +173,22 @@ export async function saveMakeConfiguration(data: {
   });
 }
 
+/**
+ * Clears the stored Make API token/fingerprint without touching scenarios or
+ * disabling the configuration — a distinct action from overwriting it with a
+ * new value, so a Super Admin can immediately cut STARS's access to Make's
+ * API (e.g. suspected leak) without also having a replacement token ready.
+ */
+export async function revokeMakeApiToken() {
+  const existing = await db.makeConfiguration.findFirst();
+  if (!existing) return;
+
+  return db.makeConfiguration.update({
+    where: { id: existing.id },
+    data: { apiTokenEnc: null, apiTokenFingerprint: null },
+  });
+}
+
 export async function updateScenario(id: string, data: {
   scenarioId?: string;
   webhookUrl?: string;
