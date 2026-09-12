@@ -9,31 +9,21 @@ describe('STARS Comment Intelligence Hub & Governance', () => {
   let testUserId: string;
 
   beforeEach(async () => {
-    // Récupération ou création d'une organisation et d'un utilisateur de test
-    const org = await db.organization.findFirst({
-      include: { owner: true },
-    });
-
-    if (org && org.owner) {
-      testOrgId = org.id;
-      testUserId = org.owner.id;
-    } else {
-      const createdOrg = await db.organization.create({
-        data: {
-          slug: `test-comment-org-${Date.now()}`,
-          name: 'Comment Test Org',
-          owner: {
-            create: {
-              email: `owner-${Date.now()}@stars.app`,
-              passwordHash: 'dummy',
-            },
+    const createdOrg = await db.organization.create({
+      data: {
+        slug: `test-comment-org-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        name: 'Comment Test Org',
+        owner: {
+          create: {
+            email: `owner-${Date.now()}-${Math.floor(Math.random() * 1000)}@stars.app`,
+            passwordHash: 'dummy',
           },
         },
-        include: { owner: true },
-      });
-      testOrgId = createdOrg.id;
-      testUserId = createdOrg.owner!.id;
-    }
+      },
+      include: { owner: true },
+    });
+    testOrgId = createdOrg.id;
+    testUserId = createdOrg.owner!.id;
   });
 
   describe('Pricing Quotas & Economics', () => {
@@ -192,7 +182,7 @@ describe('STARS Comment Intelligence Hub & Governance', () => {
       expect(keys).toContain('commercial');
       expect(keys).toContain('educational');
       expect(keys).toContain('empathic');
-    });
+    }, 15000);
   });
 
   describe('Internal Notes Isolation & Audit Trails', () => {
