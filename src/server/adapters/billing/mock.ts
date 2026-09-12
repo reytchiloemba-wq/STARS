@@ -2,6 +2,7 @@ import type {
   BillingProvider,
   CheckoutSessionRequest,
   CreditPackCheckoutRequest,
+  CommentPackCheckoutRequest,
   InvoiceSummary,
   PortalSessionRequest,
 } from './types';
@@ -21,6 +22,10 @@ export class MockBillingProvider implements BillingProvider {
   }
 
   async createCreditPackCheckoutSession(_req: CreditPackCheckoutRequest): Promise<{ url: string }> {
+    throw new Error(NOT_CONFIGURED_MESSAGE);
+  }
+
+  async createCommentPackCheckoutSession(_req: CommentPackCheckoutRequest): Promise<{ url: string }> {
     throw new Error(NOT_CONFIGURED_MESSAGE);
   }
 

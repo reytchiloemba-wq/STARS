@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { getPlan, type PlanKey } from '@/config/pricing';
-import { applyCreditPackPurchase } from '@/server/services/billing.service';
+import { applyCreditPackPurchase, applyCommentPackPurchase } from '@/server/services/billing.service';
 import { SubStatus, BillingCycle } from '@prisma/client';
 
 // Stripe requires the raw, unparsed request body to verify the webhook
@@ -67,6 +67,11 @@ export async function POST(req: Request): Promise<Response> {
 
       if (session.mode === 'payment' && session.metadata?.creditPackCredits) {
         await applyCreditPackPurchase(organizationId, Number(session.metadata.creditPackCredits), session.id);
+        break;
+      }
+
+      if (session.mode === 'payment' && session.metadata?.commentPackComments) {
+        await applyCommentPackPurchase(organizationId, Number(session.metadata.commentPackComments));
         break;
       }
 

@@ -9,6 +9,7 @@ import {
   type IncidentSeverity,
   Prisma,
 } from '@prisma/client';
+import { checkAndConsumeCommentQuota, checkAndConsumeSuggestionQuota } from '../usage.service';
 
 export interface CommentFilterParams {
   organizationId: string;
@@ -253,22 +254,41 @@ export class CommentIntelligenceService {
   /**
    * Calcul du SLA en fonction du niveau de priorité
    */
+  static readonly DEFAULT_SLA_MINUTES: Record<CommentPriorityLevel, number> = {
+    CRITICAL: 30,
+    HIGH: 120,
+    NORMAL: 480,
+    LOW: 1440,
+  };
+
+  /**
+   * Per-tenant SLA override (spec: "configurables par tenant et par
+   * forfait") — falls back to DEFAULT_SLA_MINUTES when a tenant has never
+   * customized theirs.
+   */
+  static async calculateSlaDueDateForOrg(
+    organizationId: string,
+    priorityLevel: CommentPriorityLevel,
+    fromDate = new Date(),
+  ): Promise<Date> {
+    const profile = await db.sLAProfile.findUnique({ where: { organizationId } });
+    const minutes = profile
+      ? {
+          CRITICAL: profile.criticalMinutes,
+          HIGH: profile.highMinutes,
+          NORMAL: profile.normalMinutes,
+          LOW: profile.lowMinutes,
+        }[priorityLevel]
+      : this.DEFAULT_SLA_MINUTES[priorityLevel];
+
+    const due = new Date(fromDate.getTime());
+    due.setMinutes(due.getMinutes() + minutes);
+    return due;
+  }
+
   static calculateSlaDueDate(priorityLevel: CommentPriorityLevel, fromDate = new Date()): Date {
     const due = new Date(fromDate.getTime());
-    switch (priorityLevel) {
-      case 'CRITICAL':
-        due.setMinutes(due.getMinutes() + 30); // 30 minutes
-        break;
-      case 'HIGH':
-        due.setHours(due.getHours() + 2); // 2 heures
-        break;
-      case 'NORMAL':
-        due.setHours(due.getHours() + 8); // 8 heures
-        break;
-      case 'LOW':
-        due.setHours(due.getHours() + 24); // 24 heures
-        break;
-    }
+    due.setMinutes(due.getMinutes() + this.DEFAULT_SLA_MINUTES[priorityLevel]);
     return due;
   }
 
@@ -288,6 +308,45 @@ export class CommentIntelligenceService {
 
     if (existing) {
       return { comment: existing, isDuplicate: true };
+    }
+
+    // Quota du forfait (spec: "contrôlés côté serveur") — un commentaire
+    // réel reçu par webhook n'est JAMAIS perdu au-delà du quota, mais son
+    // enrichissement IA (classification, priorité, SLA) est différé tant que
+    // le tenant n'achète pas un pack ou ne change pas de forfait.
+    const quota = await checkAndConsumeCommentQuota(input.organizationId);
+    if (!quota.allowed) {
+      const comment = await db.socialComment.create({
+        data: {
+          organizationId: input.organizationId,
+          socialAccountId: input.socialAccountId,
+          publicationId: input.publicationId,
+          parentCommentId: input.parentCommentId,
+          platform: input.platform,
+          externalCommentId: input.externalCommentId,
+          externalPostId: input.externalPostId,
+          externalAuthorId: input.externalAuthorId,
+          authorName: input.authorName,
+          authorUsername: input.authorUsername,
+          authorAvatarUrl: input.authorAvatarUrl,
+          content: input.content,
+          publishedAt: input.publishedAt || new Date(),
+          categoryReason: quota.reason,
+          status: 'TO_QUALIFY',
+          postContextSummary: input.postContextSummary,
+        },
+      });
+
+      await db.socialCommentAudit.create({
+        data: {
+          commentId: comment.id,
+          toStatus: comment.status,
+          reason: quota.reason ?? 'Quota de commentaires du forfait atteint',
+          metadata: { platform: input.platform, quotaExceeded: true },
+        },
+      });
+
+      return { comment, isDuplicate: false, quotaExceeded: true };
     }
 
     // Analyse sémantique si sentiment ou catégorie non fournis
@@ -330,7 +389,7 @@ export class CommentIntelligenceService {
       assignedTeam = 'SUPPORT';
     }
 
-    const slaDueAt = this.calculateSlaDueDate(priority.level, input.publishedAt || new Date());
+    const slaDueAt = await this.calculateSlaDueDateForOrg(input.organizationId, priority.level, input.publishedAt || new Date());
 
     const comment = await db.socialComment.create({
       data: {
@@ -572,6 +631,13 @@ export class CommentIntelligenceService {
       });
 
       return [sensitiveSuggestion];
+    }
+
+    // Quota du forfait — jamais appliqué au garde-fou de sécurité ci-dessus,
+    // qui reste toujours disponible quel que soit le forfait.
+    const quota = await checkAndConsumeSuggestionQuota(params.organizationId);
+    if (!quota.allowed) {
+      throw new Error(quota.reason);
     }
 
     // Variantes de réponses adaptées
@@ -901,5 +967,82 @@ export class CommentIntelligenceService {
     }
 
     return { isCrisis: false, incident: null, stats: { totalRecent, negativeRecent, sensitiveRecent, negativeRatio } };
+  }
+
+  /**
+   * SLA "avant et après dépassement" alerting (spec §13). Meant to be
+   * called periodically (see /api/cron/check-sla-breaches). Idempotent:
+   * `slaBreached` guards the post-breach alert from firing twice, and the
+   * pre-breach warning checks for an existing unread notification before
+   * creating another so a 5-minute cron doesn't spam the assignee.
+   */
+  static async checkSlaBreaches(organizationId: string) {
+    const now = new Date();
+
+    const active = await db.socialComment.findMany({
+      where: {
+        organizationId,
+        slaDueAt: { not: null },
+        status: {
+          notIn: ['REPLIED', 'CLOSED', 'SPAM', 'DELETED', 'HIDDEN', 'NO_REPLY_NEEDED'],
+        },
+      },
+      select: { id: true, slaDueAt: true, slaBreached: true, createdAt: true, assignedUserId: true, priorityLevel: true },
+    });
+
+    const org = await db.organization.findUnique({ where: { id: organizationId }, select: { ownerId: true } });
+    const fallbackUserId = org?.ownerId;
+
+    let breachedCount = 0;
+    let warnedCount = 0;
+
+    for (const c of active) {
+      if (!c.slaDueAt) continue;
+      const recipientId = c.assignedUserId ?? fallbackUserId;
+      if (!recipientId) continue;
+
+      if (!c.slaBreached && c.slaDueAt.getTime() <= now.getTime()) {
+        await db.socialComment.update({ where: { id: c.id }, data: { slaBreached: true } });
+        await db.notification.create({
+          data: {
+            organizationId,
+            userId: recipientId,
+            kind: 'comment.sla_breached',
+            payload: { commentId: c.id, priorityLevel: c.priorityLevel, slaDueAt: c.slaDueAt.toISOString() },
+          },
+        });
+        breachedCount++;
+        continue;
+      }
+
+      if (!c.slaBreached) {
+        const totalMs = c.slaDueAt.getTime() - c.createdAt.getTime();
+        const remainingMs = c.slaDueAt.getTime() - now.getTime();
+        const approachingBreach = totalMs > 0 && remainingMs > 0 && remainingMs / totalMs <= 0.2;
+
+        if (approachingBreach) {
+          const alreadyWarned = await db.notification.findFirst({
+            where: {
+              organizationId,
+              kind: 'comment.sla_at_risk',
+              payload: { path: ['commentId'], equals: c.id },
+            },
+          });
+          if (!alreadyWarned) {
+            await db.notification.create({
+              data: {
+                organizationId,
+                userId: recipientId,
+                kind: 'comment.sla_at_risk',
+                payload: { commentId: c.id, priorityLevel: c.priorityLevel, slaDueAt: c.slaDueAt.toISOString() },
+              },
+            });
+            warnedCount++;
+          }
+        }
+      }
+    }
+
+    return { breachedCount, warnedCount, checkedCount: active.length };
   }
 }

@@ -6,6 +6,7 @@ import { getBillingProvider } from '@/server/adapters/billing';
 import { getPlan, formatPriceCents, type PlanKey } from '@/config/pricing';
 import BillingPlans from '@/components/billing-plans';
 import CreditPackList from '@/components/credit-pack-list';
+import CommentPackList from '@/components/comment-pack-list';
 import { openBillingPortalAction } from './actions';
 
 export default async function BillingPage({
@@ -117,6 +118,13 @@ export default async function BillingPage({
           Packs de crédits supplémentaires
         </h2>
         <CreditPackList org={org} />
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Packs de commentaires supplémentaires
+        </h2>
+        <CommentPackList org={org} />
       </section>
 
       <section>

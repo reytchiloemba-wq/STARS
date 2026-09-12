@@ -102,6 +102,7 @@ model Organization {
   socialComments     SocialComment[]
   crisisIncidents    CrisisIncident[]
   moderationRules    ModerationRule[]
+  slaProfile         SLAProfile?
 }
 
 enum OrgStatus {
@@ -234,15 +235,22 @@ enum BillingCycle {
 }
 
 model Usage {
-  id                String   @id @default(cuid())
-  organizationId    String   @unique
-  periodStart       DateTime
-  periodEnd         DateTime
-  directSearches    Int      @default(0)
-  topicsAnalyzed    Int      @default(0)
-  aiImagesGenerated Int      @default(0)
-  publications      Int      @default(0)
-  storageBytes      BigInt   @default(0)
+  id                     String   @id @default(cuid())
+  organizationId         String   @unique
+  periodStart            DateTime
+  periodEnd              DateTime
+  directSearches         Int      @default(0)
+  topicsAnalyzed         Int      @default(0)
+  aiImagesGenerated      Int      @default(0)
+  publications           Int      @default(0)
+  storageBytes           BigInt   @default(0)
+  commentsIngested       Int      @default(0)
+  aiSuggestionsGenerated Int      @default(0)
+  // Packs never expire mid-period into a hard wall: they add headroom on
+  // top of the plan's monthly allowance, decremented before ever blocking
+  // ingestion (spec: "ne jamais dépasser automatiquement un quota sans
+  // consentement" — a pack purchase IS that consent, given in advance).
+  extraCommentsBalance   Int      @default(0)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
@@ -1516,6 +1524,21 @@ enum TeamQueue {
   LEGAL
   PR
   CRISIS
+}
+
+// Per-tenant override of the plan's default SLA minutes-to-respond by
+// priority level (spec: "configurables par tenant et par forfait"). Absent
+// row = the plan default in DEFAULT_SLA_MINUTES (comment.service.ts) applies.
+model SLAProfile {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+  criticalMinutes Int      @default(30)
+  highMinutes     Int      @default(120)
+  normalMinutes   Int      @default(480)
+  lowMinutes      Int      @default(1440)
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 model SocialComment {

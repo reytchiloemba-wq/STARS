@@ -309,6 +309,19 @@ export const CREDIT_PACKS: CreditPack[] = [
   { credits: 1500, priceCents: 44900, validityMonths: 12 },
 ];
 
+export interface CommentPack {
+  comments: number;
+  priceCents: number;
+}
+
+// Distinct from CREDIT_PACKS: these top up `Usage.extraCommentsBalance`
+// (raw comment ingestion/sync headroom), never STARS Intelligence Credits.
+export const COMMENT_PACKS: CommentPack[] = [
+  { comments: 1000, priceCents: 1900 },
+  { comments: 5000, priceCents: 6900 },
+  { comments: 20000, priceCents: 19900 },
+];
+
 export interface FoundersPromo {
   enabled: boolean;
   badge: string;

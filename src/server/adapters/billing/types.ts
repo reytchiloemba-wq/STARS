@@ -28,6 +28,17 @@ export interface CreditPackCheckoutRequest {
   cancelUrl: string;
 }
 
+export interface CommentPackCheckoutRequest {
+  organizationId: string;
+  organizationName: string;
+  organizationEmail: string;
+  existingStripeCustomerId?: string | null;
+  comments: number;
+  priceCents: number;
+  successUrl: string;
+  cancelUrl: string;
+}
+
 export interface InvoiceSummary {
   id: string;
   number: string | null;
@@ -41,6 +52,7 @@ export interface BillingProvider {
   isConfigured(): boolean;
   createCheckoutSession(req: CheckoutSessionRequest): Promise<{ url: string }>;
   createCreditPackCheckoutSession(req: CreditPackCheckoutRequest): Promise<{ url: string }>;
+  createCommentPackCheckoutSession(req: CommentPackCheckoutRequest): Promise<{ url: string }>;
   createPortalSession(req: PortalSessionRequest): Promise<{ url: string }>;
   listInvoices(stripeCustomerId: string): Promise<InvoiceSummary[]>;
 }

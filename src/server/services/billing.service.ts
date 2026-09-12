@@ -1,8 +1,9 @@
 import { db } from '@/lib/db';
 import type { TenantContext } from '@/lib/tenant';
 import { getBillingProvider } from '@/server/adapters/billing';
-import { getPlan, type PlanKey, CREDIT_PACKS } from '@/config/pricing';
+import { getPlan, type PlanKey, CREDIT_PACKS, COMMENT_PACKS } from '@/config/pricing';
 import { grantCredits } from '@/server/services/credits.service';
+import { grantExtraComments } from '@/server/services/usage.service';
 import { CreditReason } from '@prisma/client';
 
 function baseUrl() {
@@ -53,6 +54,28 @@ export async function startCreditPackCheckout(
   });
 }
 
+export async function startCommentPackCheckout(
+  ctx: TenantContext,
+  packIndex: number,
+  ownerEmail: string,
+): Promise<{ url: string }> {
+  const pack = COMMENT_PACKS[packIndex];
+  if (!pack) throw new Error('Unknown comment pack');
+
+  const existingSub = await db.subscription.findUnique({ where: { organizationId: ctx.organization.id } });
+
+  return getBillingProvider().createCommentPackCheckoutSession({
+    organizationId: ctx.organization.id,
+    organizationName: ctx.organization.name,
+    organizationEmail: ownerEmail,
+    existingStripeCustomerId: existingSub?.stripeCustomerId ?? null,
+    comments: pack.comments,
+    priceCents: pack.priceCents,
+    successUrl: `${baseUrl()}/w/${ctx.organization.slug}/settings/billing?comments=success`,
+    cancelUrl: `${baseUrl()}/w/${ctx.organization.slug}/settings/billing?comments=cancelled`,
+  });
+}
+
 export async function startBillingPortal(ctx: TenantContext): Promise<{ url: string }> {
   const sub = await db.subscription.findUnique({ where: { organizationId: ctx.organization.id } });
   if (!sub?.stripeCustomerId) {
@@ -78,4 +101,9 @@ export async function listOrganizationInvoices(ctx: TenantContext) {
  */
 export async function applyCreditPackPurchase(organizationId: string, credits: number, stripeSessionId: string) {
   await grantCredits(organizationId, credits, CreditReason.CREDIT_PACK_PURCHASE, { stripeSessionId });
+}
+
+/** Same idempotency contract as applyCreditPackPurchase — see that doc. */
+export async function applyCommentPackPurchase(organizationId: string, comments: number) {
+  await grantExtraComments(organizationId, comments);
 }

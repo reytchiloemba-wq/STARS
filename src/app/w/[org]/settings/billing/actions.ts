@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { requireTenantPermission } from '@/lib/tenant';
 import { db } from '@/lib/db';
 import type { PlanKey } from '@/config/pricing';
-import { startPlanCheckout, startCreditPackCheckout, startBillingPortal } from '@/server/services/billing.service';
+import { startPlanCheckout, startCreditPackCheckout, startCommentPackCheckout, startBillingPortal } from '@/server/services/billing.service';
 
 async function ownerEmail(userId: string): Promise<string> {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
@@ -37,6 +37,18 @@ export async function checkoutCreditPackAction(orgSlug: string, packIndex: numbe
   try {
     const email = await ownerEmail(ctx.userId);
     ({ url } = await startCreditPackCheckout(ctx, packIndex, email));
+  } catch (err) {
+    billingErrorRedirect(orgSlug, err);
+  }
+  redirect(url);
+}
+
+export async function checkoutCommentPackAction(orgSlug: string, packIndex: number) {
+  const ctx = await requireTenantPermission(orgSlug, 'billing.manage');
+  let url: string;
+  try {
+    const email = await ownerEmail(ctx.userId);
+    ({ url } = await startCommentPackCheckout(ctx, packIndex, email));
   } catch (err) {
     billingErrorRedirect(orgSlug, err);
   }

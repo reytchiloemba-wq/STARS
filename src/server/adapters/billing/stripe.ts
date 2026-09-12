@@ -4,6 +4,7 @@ import type {
   BillingProvider,
   CheckoutSessionRequest,
   CreditPackCheckoutRequest,
+  CommentPackCheckoutRequest,
   InvoiceSummary,
   PortalSessionRequest,
 } from './types';
@@ -95,6 +96,33 @@ export class StripeBillingProvider implements BillingProvider {
         },
       ],
       metadata: { organizationId: req.organizationId, creditPackCredits: String(req.credits) },
+      success_url: req.successUrl,
+      cancel_url: req.cancelUrl,
+    });
+
+    if (!session.url) throw new Error('Stripe did not return a checkout URL.');
+    return { url: session.url };
+  }
+
+  async createCommentPackCheckoutSession(req: CommentPackCheckoutRequest): Promise<{ url: string }> {
+    const stripe = this.requireClient();
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer: req.existingStripeCustomerId ?? undefined,
+      customer_email: req.existingStripeCustomerId ? undefined : req.organizationEmail,
+      client_reference_id: req.organizationId,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: CURRENCY.toLowerCase(),
+            unit_amount: req.priceCents,
+            product_data: { name: `Pack de ${req.comments.toLocaleString('fr-FR')} commentaires supplémentaires` },
+          },
+        },
+      ],
+      metadata: { organizationId: req.organizationId, commentPackComments: String(req.comments) },
       success_url: req.successUrl,
       cancel_url: req.cancelUrl,
     });
