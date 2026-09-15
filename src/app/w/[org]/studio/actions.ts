@@ -158,3 +158,44 @@ export async function attachIllustrationAction(
     return { ok: false, error: err instanceof Error ? err.message : 'Erreur illustration' };
   }
 }
+
+export async function generateIllustrationAction(
+  orgSlug: string,
+  params: {
+    prompt: string;
+    aspectRatio?: '16:9' | '1:1' | '4:5';
+    altText?: string;
+    draftId?: string;
+  },
+): Promise<{
+  ok: boolean;
+  asset?: { id: string; url: string; altText?: string | null; aiPrompt?: string | null; licenseNote?: string | null };
+  error?: string;
+}> {
+  try {
+    const ctx = await resolveTenant(orgSlug);
+    const asset = await EditorialService.generateAiIllustration({
+      organizationId: ctx.organization.id,
+      userId: ctx.userId,
+      prompt: params.prompt,
+      aspectRatio: params.aspectRatio,
+      altText: params.altText,
+      draftId: params.draftId,
+    });
+    return {
+      ok: true,
+      asset: {
+        id: asset.id,
+        url: asset.url,
+        altText: asset.altText,
+        aiPrompt: asset.aiPrompt,
+        licenseNote: asset.licenseNote,
+      },
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'Erreur lors de la génération de l’illustration',
+    };
+  }
+}

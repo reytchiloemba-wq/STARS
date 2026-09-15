@@ -3,10 +3,10 @@ import { PLANS, CREDIT_PACKS } from '@/config/pricing';
 
 describe('FinOps Unit Economics & Target Gross Margin (> 70%)', () => {
   // Conservative estimate of technical costs per SIC:
-  // - Make operation: ~0.009 €
-  // - AI prompt/completion tokens (Claude 3.5 Sonnet / GPT-4o blend): ~0.018 €
-  // - Real-time web search / scraping: ~0.006 €
-  // Total technical cost per SIC = 0.033 € HT (worst case scenario)
+  // - Direct AI prompt/completion tokens (Claude 3.5 Sonnet / GPT-4o blend): ~0.018 €
+  // - Real-time web search / scraping & extraction: ~0.006 €
+  // - Media Vault storage & CDN distribution: ~0.002 €
+  // Total technical cost per SIC <= 0.033 € HT (conservative upper bound)
   const MAX_TECHNICAL_COST_PER_SIC_EUR = 0.033;
   const MIN_TARGET_GROSS_MARGIN = 0.70; // 70% minimum target
 

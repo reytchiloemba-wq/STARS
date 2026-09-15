@@ -19,7 +19,7 @@ export interface PlanQuotas {
   domains: number;
   /**
    * STARS Intelligence Credits (SIC) granted per billing period.
-   * SIC meters all technical consumption (Make scenarios, LLM tokens, search engine queries,
+   * SIC meters all technical consumption (LLM tokens, search engine queries,
    * web scraping, image generation). Discovery's pool (10) covers: 3 express (3) + 1 deep (3) + 2 illustrations (4) = 10.
    */
   creditsPerMonth: number;
@@ -260,7 +260,7 @@ export const PLANS: PlanDefinition[] = [
       'Plusieurs entités et filiales',
       'Sources privées & connecteurs personnalisés',
       'Modèles IA personnalisés & RAG d’entreprise',
-      'Infrastructure hybride ou dédiée (Make ou native)',
+      'Infrastructure souveraine haute disponibilité & faible latence',
       'SSO SAML/OIDC & SCIM',
       'Rôles personnalisés & audit avancé',
       'Options de résidence des données & chiffrement dédié',
@@ -279,7 +279,7 @@ export function getPlan(key: PlanKey): PlanDefinition {
 
 /**
  * STARS Intelligence Credits (SIC) — Barème officiel configurable.
- * Regroupe les coûts de Make, recherche, extraction, IA, traduction et illustration.
+ * Regroupe les coûts de recherche, extraction, IA, traduction et illustration.
  */
 export const CREDIT_COSTS = {
   ANALYSIS_EXPRESS: 1,

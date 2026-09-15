@@ -48,8 +48,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/infrastructure" className="hover:text-foreground">
               Infrastructure &amp; Connexions
             </Link>
-            <Link href="/admin/infrastructure/make" className="rounded-lg bg-accent-cyan/15 px-2.5 py-1 text-accent-cyan font-bold hover:bg-accent-cyan/25 transition-colors">
-              Make &amp; FinOps
+            <Link href="/admin/finops" className="rounded-lg bg-accent-cyan/15 px-2.5 py-1 text-accent-cyan font-bold hover:bg-accent-cyan/25 transition-colors">
+              FinOps &amp; Marge Brute
             </Link>
             <Link href="/admin/pricing" className="hover:text-foreground">
               Tarification

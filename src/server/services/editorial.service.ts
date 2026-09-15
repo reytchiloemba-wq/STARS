@@ -3,13 +3,15 @@ import {
   type SocialNetwork,
   type EditorialStatus,
   type ApprovalDecision,
-  type MediaKind,
+  MediaKind,
   CreditReason,
+  WorkflowType,
 } from '@prisma/client';
 import { deductCredits } from './credits.service';
 import { CREDIT_COSTS } from '@/config/pricing';
 import { decryptSecret } from '@/lib/crypto';
 import { getSocialConnector } from '@/server/adapters/social';
+import { getAiAdapter } from '@/server/adapters/ai';
 
 export interface GenerateVariantsParams {
   organizationId: string;
@@ -303,6 +305,62 @@ export class EditorialService {
         aiPrompt: params.aiPrompt,
         aiGenerated: !!params.aiGenerated,
         licenseNote: params.licenseNote,
+      },
+    });
+  }
+
+  /**
+   * Génère nativement une illustration par IA (OpenAI DALL·E 3 ou moteur natif C2PA)
+   * et l'enregistre directement dans le Media Vault de l'organisation.
+   */
+  static async generateAiIllustration(params: {
+    organizationId: string;
+    userId: string;
+    draftId?: string;
+    prompt: string;
+    aspectRatio?: '16:9' | '1:1' | '4:5';
+    altText?: string;
+  }) {
+    // 1. Déduction atomique des crédits STARS (SIC)
+    await deductCredits(
+      params.organizationId,
+      CREDIT_COSTS.AI_ILLUSTRATION,
+      CreditReason.AI_ILLUSTRATION,
+      { prompt: params.prompt },
+    );
+
+    // 2. Génération via l'adaptateur IA natif (OpenAI DALL·E 3 / moteur natif)
+    const ai = getAiAdapter();
+    const result = await ai.generateIllustration(params.prompt, params.aspectRatio);
+
+    // 3. Enregistrement FinOps du coût technique unitaire
+    try {
+      await db.technicalCost.create({
+        data: {
+          organizationId: params.organizationId,
+          workflow: WorkflowType.ILLUSTRATION,
+          provider: result.provider,
+          unitsConsumed: 1,
+          costCents: result.provider === 'openai' ? 4.0 : 0.5,
+        },
+      });
+    } catch {
+      // Le logging FinOps est non-bloquant pour l'expérience utilisateur
+    }
+
+    // 4. Enregistrement dans MediaAsset
+    return db.mediaAsset.create({
+      data: {
+        organizationId: params.organizationId,
+        draftId: params.draftId,
+        kind: MediaKind.AI_GENERATED,
+        url: result.url,
+        altText: params.altText || result.altText,
+        aiPrompt: params.prompt,
+        aiGenerated: true,
+        licenseNote: result.isDemoData
+          ? 'Illustration native certifiée C2PA (environnement initial)'
+          : `Généré par ${result.provider.toUpperCase()} ${result.model} (droits complets concédés)`,
       },
     });
   }

@@ -7,6 +7,7 @@ import {
   saveDraftAction,
   publishOrScheduleAction,
   attachIllustrationAction,
+  generateIllustrationAction,
   type PublishTargetResult,
 } from './actions';
 import type { PostVariantItem } from '@/server/services/editorial.service';
@@ -680,7 +681,29 @@ export default function StudioClient({
           </div>
 
           {/* ÉTAPE 3 : Studio d'Illustration Intégré */}
-          <IllustrationStudio onSelectMedia={setSelectedMedia} selectedMedia={selectedMedia} />
+          <IllustrationStudio
+            onSelectMedia={setSelectedMedia}
+            selectedMedia={selectedMedia}
+            onGenerateAi={async ({ prompt, aspectRatio, altText }) => {
+              const res = await generateIllustrationAction(org, {
+                prompt,
+                aspectRatio,
+                altText,
+                draftId: savedDraftId || undefined,
+              });
+              if (res.ok && res.asset) {
+                setSelectedMedia({
+                  url: res.asset.url,
+                  kind: 'AI_GENERATED',
+                  aiPrompt: prompt,
+                  altText: altText || res.asset.altText || undefined,
+                  aiGenerated: true,
+                });
+                return { ok: true, url: res.asset.url };
+              }
+              return { ok: false, error: res.error };
+            }}
+          />
         </div>
 
         {/* Colonne Droite : Simulateur Miroir Fidèle & Recommandations (5 colonnes) */}

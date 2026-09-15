@@ -49,9 +49,15 @@ const AI_PRESET_PROMPTS = [
 export default function IllustrationStudio({
   onSelectMedia,
   selectedMedia,
+  onGenerateAi,
 }: {
   onSelectMedia: (media: SelectedMedia | null) => void;
   selectedMedia: SelectedMedia | null;
+  onGenerateAi?: (params: {
+    prompt: string;
+    aspectRatio: '1:1' | '4:5' | '16:9';
+    altText?: string;
+  }) => Promise<{ ok: boolean; url?: string; error?: string }>;
 }) {
   const [tab, setTab] = useState<'AI' | 'STOCK' | 'UPLOAD'>('AI');
   const [aiPrompt, setAiPrompt] = useState(AI_PRESET_PROMPTS[0]);
@@ -59,25 +65,39 @@ export default function IllustrationStudio({
   const [altText, setAltText] = useState('Graphique d’intelligence stratégique illustrant les tendances');
   const [customUrl, setCustomUrl] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  function handleGenerateAi() {
+  async function handleGenerateAi() {
     setIsGenerating(true);
-    setTimeout(() => {
-      const generatedUrl = aspectRatio === '1:1'
-        ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop'
-        : aspectRatio === '4:5'
-        ? 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=800&auto=format&fit=crop'
-        : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop';
+    setErrorMessage(null);
 
-      onSelectMedia({
-        url: generatedUrl,
-        kind: 'AI_GENERATED',
-        aiPrompt,
-        altText,
-        aiGenerated: true,
-      });
+    try {
+      if (onGenerateAi) {
+        const res = await onGenerateAi({ prompt: aiPrompt || '', aspectRatio, altText: altText || '' });
+        if (!res.ok) {
+          setErrorMessage(res.error || 'Erreur lors de la génération.');
+        }
+      } else {
+        const generatedUrl =
+          aspectRatio === '1:1'
+            ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop'
+            : aspectRatio === '4:5'
+            ? 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=800&auto=format&fit=crop'
+            : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop';
+
+        onSelectMedia({
+          url: generatedUrl,
+          kind: 'AI_GENERATED',
+          aiPrompt,
+          altText,
+          aiGenerated: true,
+        });
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Erreur inattendue');
+    } finally {
       setIsGenerating(false);
-    }, 700);
+    }
   }
 
   return (
@@ -230,6 +250,12 @@ export default function IllustrationStudio({
               <p className="mt-1 text-[10px] text-muted-foreground">Conformité RGPD et accessibilité web automatique.</p>
             </div>
           </div>
+
+          {errorMessage && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-2.5 text-xs text-danger">
+              ⚠️ {errorMessage}
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border/60 pt-3">
             <span className="text-[11px] text-muted-foreground">
