@@ -169,7 +169,7 @@ export async function startOAuthFlow(
     scope: config.scopes.join(' '),
   });
 
-  if (network !== 'FACEBOOK' && network !== 'INSTAGRAM') {
+  if (network === 'X') {
     params.set('code_challenge', codeChallenge);
     params.set('code_challenge_method', 'S256');
   }
@@ -258,7 +258,7 @@ export async function completeOAuthFlow(
 
   if (network !== 'FACEBOOK' && network !== 'INSTAGRAM') {
     tokenParams.grant_type = 'authorization_code';
-    if (stateRow.codeVerifier) {
+    if (network === 'X' && stateRow.codeVerifier) {
       tokenParams.code_verifier = stateRow.codeVerifier;
     }
   }
@@ -279,7 +279,13 @@ export async function completeOAuthFlow(
     let detailMsg = `HTTP ${tokenRes?.status ?? 'réseau'}`;
     try {
       const parsed = JSON.parse(errorBody);
-      if (parsed.error?.message) detailMsg += ` - ${parsed.error.message}`;
+      if (parsed.error_description) {
+        detailMsg += ` - ${parsed.error_description}`;
+      } else if (parsed.error?.message) {
+        detailMsg += ` - ${parsed.error.message}`;
+      } else if (typeof parsed.error === 'string') {
+        detailMsg += ` - ${parsed.error}`;
+      }
     } catch {}
     throw new OAuthCallbackError(
       `Échec de l'échange du code d'autorisation auprès de ${network} (${detailMsg}).`,
