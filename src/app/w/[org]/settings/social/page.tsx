@@ -80,11 +80,27 @@ export default async function SocialSettingsPage({
 
       {/* Messages de succès ou d'erreur */}
       {connected && (
-        <div className="flex items-center gap-3 rounded-xl border border-success/40 bg-success/10 p-4 text-xs text-success">
-          <span className="text-base">✓</span>
-          <span>
-            Compte <strong>{connected.toUpperCase()}</strong> connecté avec succès ! Il est maintenant disponible dans le Studio Éditorial.
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-success/40 bg-success/15 p-5 text-success shadow-lg backdrop-blur-md">
+          <div className="flex items-center gap-3.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success/20 text-lg font-bold">
+              ✓
+            </span>
+            <div>
+              <div className="text-sm font-bold text-white">
+                Compte {connected.toUpperCase()} connecté et activé avec succès !
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Votre compte est maintenant lié et prêt pour la publication dans le Studio Éditorial.
+              </p>
+            </div>
+          </div>
+          <Link
+            href={`/w/${org}/studio`}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-start-gradient px-4 py-2 text-xs font-bold text-white shadow-md transition hover:scale-[1.02] hover:opacity-95"
+          >
+            <span>Créer un post dans le Studio</span>
+            <span>→</span>
+          </Link>
         </div>
       )}
 
@@ -98,73 +114,20 @@ export default async function SocialSettingsPage({
         </div>
       )}
 
-      {/* Grille des 4 réseaux disponibles pour connexion */}
-      <section className="space-y-4">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Connecter un nouveau réseau
-        </h2>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {NETWORKS.map((n) => {
-            const connectedAccount = accounts.find((a) => a.network === n.networkEnum);
-            return (
-              <div
-                key={n.key}
-                className="glass-card flex flex-col justify-between rounded-2xl p-5"
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl">{n.icon}</span>
-                    {connectedAccount ? (
-                      <span className="rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] font-bold text-success">
-                        Connecté
-                      </span>
-                    ) : (
-                      <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-[10px] text-muted-foreground">
-                        Non lié
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="mt-3 font-display text-base font-bold text-white">{n.label}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{n.description}</p>
-                </div>
-
-                <div className="mt-5 space-y-2 border-t border-border/60 pt-4">
-                  {/* Bouton OAuth Réel */}
-                  <a
-                    href={`/api/oauth/${n.key}/start?org=${org}`}
-                    className="block w-full rounded-xl bg-start-gradient py-2 text-center text-xs font-bold text-white shadow-sm transition hover:scale-[1.01] hover:opacity-95"
-                  >
-                    Connecter via {n.label} ↗
-                  </a>
-
-                  {/* Bouton Sandbox Instantané */}
-                  {!connectedAccount && (
-                    <form action={connectSandboxAccountAction.bind(null, org, n.networkEnum)}>
-                      <button
-                        type="submit"
-                        className="w-full rounded-xl border border-border/80 bg-surface-raised/80 py-1.5 text-center text-[11px] font-medium text-muted-foreground transition hover:border-accent-cyan hover:text-white"
-                      >
-                        + Activer compte Sandbox
-                      </button>
-                    </form>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Liste des comptes déjà connectés */}
+      {/* Liste des comptes déjà connectés (prioritaire si comptes présents) */}
       <section className="glass-card rounded-2xl p-6">
         <div className="flex items-center justify-between border-b border-border/80 pb-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-white">
-            Comptes connectés & autorisés ({accounts.length})
-          </h2>
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+              Comptes connectés & autorisés ({accounts.length})
+            </h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Ces comptes sont disponibles immédiatement pour diffuser ou programmer vos publications.
+            </p>
+          </div>
           <Link
             href={`/w/${org}/studio`}
-            className="text-xs font-semibold text-accent-cyan hover:underline"
+            className="rounded-xl bg-start-gradient px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:scale-[1.01] hover:opacity-95"
           >
             Ouvrir le Studio Éditorial →
           </Link>
@@ -172,7 +135,7 @@ export default async function SocialSettingsPage({
 
         {accounts.length === 0 ? (
           <div className="py-10 text-center text-xs text-muted-foreground">
-            Aucun compte social connecté pour le moment. Cliquez sur un des réseaux ci-dessus pour connecter votre profil ou activer un compte de test.
+            Aucun compte social connecté pour le moment. Cliquez sur un des réseaux ci-dessous pour connecter votre profil ou activer un compte de test.
           </div>
         ) : (
           <div className="mt-4 divide-y divide-border/60">
@@ -196,18 +159,110 @@ export default async function SocialSettingsPage({
                   </div>
                 </div>
 
-                <form action={disconnect.bind(null, acc.id)}>
-                  <button
-                    type="submit"
-                    className="rounded-xl border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger transition hover:bg-danger/10"
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/w/${org}/studio`}
+                    className="rounded-xl border border-accent-cyan/40 bg-accent-cyan/10 px-3 py-1.5 text-xs font-semibold text-accent-cyan hover:bg-accent-cyan/20 transition"
                   >
-                    Déconnecter
-                  </button>
-                </form>
+                    Publier →
+                  </Link>
+                  <form action={disconnect.bind(null, acc.id)}>
+                    <button
+                      type="submit"
+                      className="rounded-xl border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger transition hover:bg-danger/10"
+                    >
+                      Déconnecter
+                    </button>
+                  </form>
+                </div>
               </div>
             ))}
           </div>
         )}
+      </section>
+
+      {/* Grille des 4 réseaux disponibles pour connexion */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          Connecter ou gérer un réseau
+        </h2>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {NETWORKS.map((n) => {
+            const networkAccounts = accounts.filter((a) => a.network === n.networkEnum);
+            const isConnected = networkAccounts.length > 0;
+            const primaryAccount = networkAccounts[0];
+            return (
+              <div
+                key={n.key}
+                className="glass-card flex flex-col justify-between rounded-2xl p-5"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl">{n.icon}</span>
+                    {isConnected ? (
+                      <span className="rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] font-bold text-success">
+                        ✓ {networkAccounts.length} lié{networkAccounts.length > 1 ? 's' : ''}
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-[10px] text-muted-foreground">
+                        Non lié
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="mt-3 font-display text-base font-bold text-white">{n.label}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{n.description}</p>
+
+                  {isConnected && primaryAccount && (
+                    <div className="mt-3 rounded-lg border border-success/30 bg-success/10 p-2.5 text-[11px] text-white">
+                      <div className="font-semibold truncate">👤 {primaryAccount.displayName}</div>
+                      <div className="text-[10px] text-success font-medium">✓ Connecté et prêt à diffuser</div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-5 space-y-2 border-t border-border/60 pt-4">
+                  {isConnected ? (
+                    <>
+                      <Link
+                        href={`/w/${org}/studio`}
+                        className="block w-full rounded-xl bg-start-gradient py-2 text-center text-xs font-bold text-white shadow-sm transition hover:scale-[1.01] hover:opacity-95"
+                      >
+                        Publier depuis le Studio →
+                      </Link>
+                      <a
+                        href={`/api/oauth/${n.key}/start?org=${org}`}
+                        className="block w-full text-center text-[11px] text-muted-foreground hover:text-white transition py-1"
+                      >
+                        + Reconnecter un compte {n.label} ↗
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      {/* Bouton OAuth Réel */}
+                      <a
+                        href={`/api/oauth/${n.key}/start?org=${org}`}
+                        className="block w-full rounded-xl bg-start-gradient py-2 text-center text-xs font-bold text-white shadow-sm transition hover:scale-[1.01] hover:opacity-95"
+                      >
+                        Connecter via {n.label} ↗
+                      </a>
+
+                      {/* Bouton Sandbox Instantané */}
+                      <form action={connectSandboxAccountAction.bind(null, org, n.networkEnum)}>
+                        <button
+                          type="submit"
+                          className="w-full rounded-xl border border-border/80 bg-surface-raised/80 py-1.5 text-center text-[11px] font-medium text-muted-foreground transition hover:border-accent-cyan hover:text-white"
+                        >
+                          + Activer compte Sandbox
+                        </button>
+                      </form>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
     </div>
   );
