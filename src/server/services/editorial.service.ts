@@ -57,17 +57,64 @@ export class EditorialService {
       ? `\n\n📌 Sources vérifiées :\n${params.sourceUrls.map((s) => `• ${s}`).join('\n')}`
       : '';
 
+    // 1. Tenter la génération intelligente via l'adaptateur IA natif (OpenAI GPT-4o-mini, Anthropic ou Gemini)
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        const ai = getAiAdapter();
+        const aiVariants = await ai.generatePostVariants({
+          dossierTitle: params.topicTitle,
+          dossierSummary: params.summary || params.topicTitle,
+          network: params.network,
+          tone: baseTone,
+          brandVoiceName: brandVoice?.name,
+          sourceUrls: params.includeSources ? params.sourceUrls : undefined,
+        });
+
+        if (aiVariants && aiVariants.length > 0 && !aiVariants[0]?.isDemoData) {
+          // Enregistrement FinOps du coût de génération
+          try {
+            await db.technicalCost.create({
+              data: {
+                organizationId: params.organizationId,
+                workflow: WorkflowType.POST_PREPARATION,
+                provider: 'openai',
+                unitsConsumed: 1,
+                costCents: 0.15,
+              },
+            });
+          } catch {
+            // FinOps logging non-bloquant
+          }
+
+          return aiVariants.map((v, i) => ({
+            id: `var-${v.label}-${i}`,
+            label: v.label,
+            name: v.name || 'Version Éditoriale',
+            suggestedHook: v.suggestedHook || `Accroche : ${params.topicTitle}`,
+            content: v.content + (v.content.includes('📌 Sources') ? '' : sourcesFootnote),
+            hashtags: v.hashtags?.length ? v.hashtags : defaultHashtags,
+            suggestedCta: v.suggestedCta || baseCta,
+          }));
+        }
+      } catch (err) {
+        console.warn('[EditorialService] AI variant generation error, using dynamic fallback:', err);
+      }
+    }
+
+    // 2. Fallback dynamique calibré spécifiquement sur le sujet et les notes fournies
+    const summaryClean = params.summary && params.summary !== params.topicTitle ? params.summary : `Évolutions majeures et opportunités stratégiques sur ${params.topicTitle}`;
+
     const variants: PostVariantItem[] = [
       {
         id: 'var-concise',
         label: 'concise',
         name: 'Version Concise',
-        suggestedHook: `⚡ En 60 secondes : ce qu'il faut savoir sur ${params.topicTitle}`,
+        suggestedHook: `⚡ En 60 secondes : ${params.topicTitle}`,
         content: `⚡ En 60 secondes : ${params.topicTitle}.\n\n` +
-          `L'essentiel : ${params.summary.slice(0, 200)}...\n\n` +
-          `Ce qu'il faut retenir :\n` +
-          `1. Les signaux confirment une transformation majeure du secteur.\n` +
-          `2. Les opportunités d'anticipation dépassent les risques identifiés.\n\n` +
+          `📌 Les faits essentiels :\n${summaryClean}\n\n` +
+          `💡 Les 2 points à retenir :\n` +
+          `• Un tournant décisif qui redéfinit les priorités pour les acteurs du marché.\n` +
+          `• Une opportunité concrète d'anticipation pour ceux qui agissent dès maintenant.\n\n` +
           `${baseCta}${sourcesFootnote}`,
         hashtags: defaultHashtags.slice(0, 3),
         suggestedCta: baseCta,
@@ -76,13 +123,12 @@ export class EditorialService {
         id: 'var-expert',
         label: 'expert',
         name: 'Version Experte',
-        suggestedHook: `🔬 Décryptage technique & méthodologique : ${params.topicTitle}`,
+        suggestedHook: `🔬 Décryptage technique & sectoriel : ${params.topicTitle}`,
         content: `🔬 Décryptage approfondi : ${params.topicTitle}.\n\n` +
-          `Au-delà des annonces superficielles, analysons les composantes structurelles :\n\n` +
-          `• Contexte et causalité : ${params.summary}\n` +
-          `• Analyse contradictoire : la balance bénéfice/risque révèle des écarts notables entre projections et mise en œuvre réelle.\n` +
-          `• Recommandation : prioriser la conformité et l'audit continu des métriques clés.\n\n` +
-          `Les données actuelles démontrent l'importance d'une gouvernance rigoureuse.\n\n` +
+          `Au-delà des titres d'actualité, analysons les fondamentaux structurels :\n\n` +
+          `1. Analyse du contexte : ${summaryClean}\n` +
+          `2. Analyse d'impact : les arbitrages récents démontrent une accélération des transformations, nécessitant une réévaluation des indicateurs de performance.\n` +
+          `3. Recommandation : auditer en priorité les points d'inflexion et consolider les données probantes.\n\n` +
           `${baseCta}${sourcesFootnote}`,
         hashtags: [...defaultHashtags, '#AnalyseSectorielle', '#Expertise'],
         suggestedCta: 'Retrouvez les indicateurs détaillés et confrontons nos analyses.',
@@ -91,16 +137,15 @@ export class EditorialService {
         id: 'var-executive',
         label: 'executive',
         name: 'Version Dirigeant',
-        suggestedHook: `🎯 Vision C-Level : Pourquoi ${params.topicTitle} impacte votre feuille de route stratégique`,
+        suggestedHook: `🎯 Vision C-Level : Pourquoi ${params.topicTitle} impacte votre feuille de route`,
         content: `🎯 Perspective Dirigeant : ${params.topicTitle}.\n\n` +
-          `Dans un environnement de marché volatile, les décideurs doivent trancher rapidement sur trois priorités :\n\n` +
-          `1. L'impact opérationnel direct sur nos chaînes de valeur.\n` +
-          `2. La résilience des équipes face aux nouvelles réglementations.\n` +
-          `3. L'avantage compétitif réservé aux premiers entrants crédibles.\n\n` +
-          `Notre rôle n'est pas de subir l'actualité, mais d'en extraire un cap clair pour l'organisation.\n\n` +
+          `Pour les décideurs et membres de direction, ce dossier impose 3 arbitrages stratégiques immédiats :\n\n` +
+          `• Contexte économique & opérationnel : ${summaryClean}\n` +
+          `• Allocation des ressources : aligner la feuille de route sur ces signaux pour préserver la marge de manœuvre.\n` +
+          `• Posture de marché : prendre le leadership sur ce sujet plutôt que de subir les arbitrages concurrentiels.\n\n` +
           `${baseCta}${sourcesFootnote}`,
         hashtags: ['#Leadership', '#Strategie', '#Decideurs'],
-        suggestedCta: 'Quelles sont vos priorités d’arbitrage pour les prochains trimestres ?',
+        suggestedCta: 'Quelles sont vos priorités d’arbitrage sur ce dossier ?',
       },
       {
         id: 'var-pedagogical',
@@ -108,27 +153,27 @@ export class EditorialService {
         name: 'Version Pédagogique',
         suggestedHook: `💡 Comprendre simplement : ${params.topicTitle}`,
         content: `💡 Pourquoi tout le monde parle de : ${params.topicTitle} ?\n\n` +
-          `Si vous n'avez pas suivi le sujet, voici l'explication simple en 3 points :\n\n` +
-          `🔹 D'où part-on ? ${params.summary.slice(0, 150)}...\n` +
-          `🔹 Quel est le débat ? Les partisans soulignent l'accélération des gains, tandis que les contradicteurs alertent sur les coûts cachés.\n` +
-          `🔹 Ce que ça change pour vous : une adaptation nécessaire de nos pratiques quotidiennes.\n\n` +
-          `L'intelligence commence par la clarté.\n\n` +
+          `Voici l'essentiel expliqué simplement en 3 points :\n\n` +
+          `🔹 Le point de départ : ${summaryClean}\n` +
+          `🔹 L'enjeu clé : comment s'adapter intelligemment tout en évitant les écueils habituels.\n` +
+          `🔹 Ce que ça change concrètement : de nouvelles opportunités directes à intégrer dès aujourd'hui.\n\n` +
+          `La clarté est la première forme d'intelligence stratégique.\n\n` +
           `${baseCta}${sourcesFootnote}`,
         hashtags: ['#Pedagogie', '#Comprendre', '#Decouverte'],
-        suggestedCta: 'Enregistrez ce post pour le relire à tête reposée !',
+        suggestedCta: 'Enregistrez ce post pour le relire ou le partager à vos équipes !',
       },
       {
         id: 'var-high-engagement',
         label: 'high-engagement',
         name: 'Version Forte en Engagement',
-        suggestedHook: `🔥 L'erreur que 90% commettent sur ${params.topicTitle} :`,
+        suggestedHook: `🔥 ${params.topicTitle} : opportunité historique ou faux espoir ?`,
         content: `🔥 On entend tout et son contraire sur : ${params.topicTitle}.\n\n` +
-          `Et si le véritable enjeu n'était pas celui que les médias mettent en avant ?\n\n` +
-          `${params.summary}\n\n` +
-          `Les faits établis montrent qu'il y a deux camps bien distincts.\n` +
-          `D'un côté, ceux qui attendent que la vague passe.\n` +
-          `De l'autre, ceux qui structurent leur position dès aujourd'hui.\n\n` +
-          `Dans quel camp vous situez-vous ? Votez ou réagissez ci-dessous 👇\n\n` +
+          `Pourtant, les éléments concrets sont là :\n` +
+          `${summaryClean}\n\n` +
+          `Deux visions s'affrontent ouvertement sur le marché :\n` +
+          `👉 Ceux qui estiment qu'il s'agit d'un phénomène passager sans lendemain.\n` +
+          `👉 Ceux qui y voient une rupture durable nécessitant un positionnement clair.\n\n` +
+          `De quel côté penche votre analyse ? Débattons-en ci-dessous 👇\n\n` +
           `${baseCta}${sourcesFootnote}`,
         hashtags: ['#Debat', '#Innovation', '#Opinion'],
         suggestedCta: 'Donnez votre avis tranché en commentaire : opportunité réelle ou effet de mode ?',

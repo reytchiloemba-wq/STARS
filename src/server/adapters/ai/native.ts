@@ -52,19 +52,32 @@ export class NativeAiAdapter implements AiAdapter {
    * Builds the prompt instructing the LLM to generate the 5 STARS post variants
    */
   private buildVariantsPrompt(req: PostVariantRequest): string {
-    return `Tu es le directeur éditorial de STARS. Génère 5 variantes de posts pour ${req.network} basées sur :
-Sujet : ${req.dossierTitle}
-Synthèse : ${req.dossierSummary}
-Tonalité : ${req.tone}
-${req.brandVoiceName ? `Brand Voice : ${req.brandVoiceName}` : ''}
-${req.sourceUrls?.length ? `Sources vérifiées : ${req.sourceUrls.join(', ')}` : ''}
+    return `Tu es le directeur éditorial exécutif de la plateforme STARS.
+Génère 5 variantes de posts très qualitatives et adaptées au réseau ${req.network} sur le sujet suivant :
 
-Retourne STRICTEMENT un JSON valide contenant une liste d'objets avec les clés :
-"label" ('concise' | 'expert' | 'executive' | 'pedagogical' | 'high-engagement'),
-"content" (texte formaté prêt à publier),
-"suggestedHook" (accroche forte),
-"suggestedCta" (appel à l'action),
-"hashtags" (tableau de 3 à 5 hashtags pertinents).`;
+Sujet : ${req.dossierTitle}
+Synthèse & Faits clés : ${req.dossierSummary}
+Tonalité demandée : ${req.tone}
+${req.brandVoiceName ? `Identité de marque (Brand Voice) : ${req.brandVoiceName}` : ''}
+${req.sourceUrls?.length ? `Sources de référence : ${req.sourceUrls.join(', ')}` : ''}
+
+RÈGLES IMPORTANTES :
+- Chaque variante doit être rédigée en français impeccable et adaptée aux codes de ${req.network}.
+- Chaque variante doit traiter spécifiquement et en profondeur du sujet « ${req.dossierTitle} », en intégrant des arguments, des chiffres et des angles concrets issus de la synthèse.
+- Ne JAMAIS utiliser de phrases génériques ou de remplissage passe-partout.
+
+Retourne STRICTEMENT un objet JSON contenant la clé "variants", qui est un tableau de 5 objets ayant exactement cette structure :
+{
+  "variants": [
+    {
+      "label": "concise" | "expert" | "executive" | "pedagogical" | "high-engagement",
+      "suggestedHook": "Accroche percutante spécifique au sujet",
+      "content": "Texte complet du post, aéré avec sauts de lignes et emojis professionnels",
+      "suggestedCta": "Appel à l'action incitant au commentaire ou au partage",
+      "hashtags": ["#Hashtag1", "#Hashtag2", "#Hashtag3"]
+    }
+  ]
+}`;
   }
 
   private mapRawVariants(rawVariants: any[]): PostVariant[] {
