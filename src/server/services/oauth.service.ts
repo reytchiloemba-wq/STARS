@@ -104,6 +104,7 @@ export async function startOAuthFlow(
   ctx: TenantContext,
   network: SocialNetwork,
   redirectUri: string,
+  options?: { companyMode?: boolean },
 ): Promise<{ authorizeUrl: string }> {
   const providerKey = providerKeyFor(network);
   const provider = await db.integrationProvider.findUniqueOrThrow({ where: { key: providerKey } });
@@ -161,12 +162,17 @@ export async function startOAuthFlow(
     },
   });
 
+  let scopes = [...config.scopes];
+  if (network === 'LINKEDIN' && options?.companyMode) {
+    scopes = Array.from(new Set([...scopes, 'w_organization_social', 'r_organization_social']));
+  }
+
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     state,
-    scope: config.scopes.join(' '),
+    scope: scopes.join(' '),
   });
 
   if (network === 'X') {

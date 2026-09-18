@@ -21,10 +21,10 @@ export async function disconnectSocialAccountAction(orgSlug: string, accountId: 
 }
 
 const SANDBOX_NAMES: Record<SocialNetwork, string> = {
-  LINKEDIN: 'Page Entreprise LinkedIn (Compte Vérifié)',
+  LINKEDIN: 'HORUS Business Automation Engineered (Page LinkedIn)',
   X: 'Profil Officiel X / Twitter (@stars_media)',
   INSTAGRAM: 'Compte Instagram Professionnel (@stars_intelligence)',
-  FACEBOOK: 'Page Facebook Professionnelle (STARS Média)',
+  FACEBOOK: 'HORUS Business Automation Engineered (Page Facebook)',
 };
 
 export async function connectSandboxAccountAction(orgSlug: string, network: SocialNetwork) {

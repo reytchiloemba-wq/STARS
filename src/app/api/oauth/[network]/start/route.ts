@@ -55,8 +55,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ network:
 
   try {
     const ctx = await requireTenantPermission(org, 'social.connect');
+    const isCompany = searchParams.get('company') === 'true' || searchParams.get('mode') === 'company';
     const redirectUri = `${getCanonicalOrigin(req)}/api/oauth/${rawNetwork.toLowerCase()}/callback`;
-    const { authorizeUrl } = await startOAuthFlow(ctx, network, redirectUri);
+    const { authorizeUrl } = await startOAuthFlow(ctx, network, redirectUri, { companyMode: isCompany });
     return NextResponse.redirect(authorizeUrl);
   } catch (err) {
     if (err instanceof OAuthNotConfiguredError) {

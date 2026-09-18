@@ -213,10 +213,14 @@ export default async function SocialSettingsPage({
                   <h3 className="mt-3 font-display text-base font-bold text-white">{n.label}</h3>
                   <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{n.description}</p>
 
-                  {isConnected && primaryAccount && (
-                    <div className="mt-3 rounded-lg border border-success/30 bg-success/10 p-2.5 text-[11px] text-white">
-                      <div className="font-semibold truncate">👤 {primaryAccount.displayName}</div>
-                      <div className="text-[10px] text-success font-medium">✓ Connecté et prêt à diffuser</div>
+                  {isConnected && (
+                    <div className="mt-3 space-y-1.5">
+                      {networkAccounts.map((acc) => (
+                        <div key={acc.id} className="rounded-lg border border-success/30 bg-success/10 p-2 text-[11px] text-white">
+                          <div className="font-semibold truncate">👤 {acc.displayName}</div>
+                          <div className="text-[10px] text-success font-medium">✓ Connecté et prêt à diffuser</div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -230,9 +234,17 @@ export default async function SocialSettingsPage({
                       >
                         Publier depuis le Studio →
                       </Link>
+                      {n.key === 'linkedin' && (
+                        <a
+                          href={`/api/oauth/linkedin/start?org=${org}&company=true`}
+                          className="block w-full text-center text-[11px] text-accent-cyan hover:underline transition py-0.5"
+                        >
+                          + Lier Page Entreprise via OAuth ↗
+                        </a>
+                      )}
                       <a
                         href={`/api/oauth/${n.key}/start?org=${org}`}
-                        className="block w-full text-center text-[11px] text-muted-foreground hover:text-white transition py-1"
+                        className="block w-full text-center text-[11px] text-muted-foreground hover:text-white transition py-0.5"
                       >
                         + Reconnecter un compte {n.label} ↗
                       </a>
