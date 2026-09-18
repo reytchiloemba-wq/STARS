@@ -79,6 +79,20 @@ export const PROVIDERS: ProviderDefinition[] = [
     ],
     testKind: 'oauth-format-check',
   },
+  {
+    key: 'tiktok',
+    name: 'TikTok for Developers',
+    category: 'SOCIAL',
+    description: 'Publication de vidéos et diffusion sur comptes TikTok Créateurs et Entreprises via Login Kit et Content Posting API v2.',
+    docsUrl: 'https://developers.tiktok.com/doc/overview/',
+    isOAuth: true,
+    isPrimaryCapable: true,
+    credentialFields: [
+      { key: 'clientKey', label: 'Client Key', type: 'text', required: true, placeholder: 'aw...' },
+      { key: 'clientSecret', label: 'Client Secret', type: 'password', required: true },
+    ],
+    testKind: 'oauth-format-check',
+  },
 
   // --- News & search (spec §11) ---
   {

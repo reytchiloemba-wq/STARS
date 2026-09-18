@@ -72,8 +72,8 @@ export class FirecrawlAdapter implements WebExtractionAdapter {
    * 3. Encrypted vault in GlobalIntegration (Super Admin cockpit)
    */
   async getApiKey(): Promise<string | null> {
-    if (this.explicitApiKey && this.explicitApiKey.trim().length > 0) {
-      return this.explicitApiKey.trim();
+    if (this.explicitApiKey !== undefined) {
+      return this.explicitApiKey.trim().length > 0 ? this.explicitApiKey.trim() : null;
     }
 
     if (process.env.FIRECRAWL_API_KEY && process.env.FIRECRAWL_API_KEY.trim().length > 0) {

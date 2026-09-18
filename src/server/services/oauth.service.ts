@@ -122,8 +122,8 @@ export async function startOAuthFlow(
     throw new OAuthNotConfiguredError(network);
   }
 
-  const creds = decryptCredentials<{ clientId?: string; appId?: string }>(integration.credentialsEnc);
-  const clientId = creds.clientId ?? creds.appId;
+  const creds = decryptCredentials<{ clientId?: string; clientKey?: string; appId?: string }>(integration.credentialsEnc);
+  const clientId = creds.clientId ?? creds.clientKey ?? creds.appId;
   if (!clientId) throw new OAuthNotConfiguredError(network);
 
   // Détection des erreurs de saisie inter-plateformes (ex: clé Twitter/X ou Meta collée dans LinkedIn)
@@ -175,12 +175,13 @@ export async function startOAuthFlow(
     scopes = Array.from(new Set([...scopes, 'w_organization_social', 'r_organization_social']));
   }
 
+  const formattedScope = network === 'TIKTOK' ? scopes.join(',') : scopes.join(' ');
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     state,
-    scope: scopes.join(' '),
+    scope: formattedScope,
   });
 
   if (network === 'TIKTOK') {
@@ -260,10 +261,10 @@ export async function completeOAuthFlow(
   const integration = await getIntegrationForProvider(provider.id);
   if (!integration?.credentialsEnc) throw new OAuthNotConfiguredError(network);
 
-  const creds = decryptCredentials<{ clientId?: string; appId?: string; clientSecret?: string; appSecret?: string }>(
+  const creds = decryptCredentials<{ clientId?: string; clientKey?: string; appId?: string; clientSecret?: string; appSecret?: string }>(
     integration.credentialsEnc,
   );
-  const clientId = creds.clientId ?? creds.appId ?? '';
+  const clientId = creds.clientId ?? creds.clientKey ?? creds.appId ?? '';
   const clientSecret = creds.clientSecret ?? creds.appSecret ?? '';
   const config = NETWORK_CONFIG[network];
 

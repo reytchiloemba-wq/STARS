@@ -41,6 +41,15 @@ const PROVIDER_CONFIGS: ProviderSeedConfig[] = [
     isPrimary: false,
     testMessage: 'Format validé — API X v2 (Free/Basic/Pro) autorisée pour les publications automatiques.',
   },
+  {
+    key: 'tiktok',
+    credentials: {
+      clientKey: process.env.TIKTOK_CLIENT_KEY || 'aw98stars26tiktokprod',
+      clientSecret: process.env.TIKTOK_CLIENT_SECRET || 'tiktok_client_secret_stars_prod_2026_sec',
+    },
+    isPrimary: true,
+    testMessage: 'Format validé — TikTok Login Kit v2 & Content Posting API configurés et prêts pour l’authentification.',
+  },
 
   // 2. News & search
   {
