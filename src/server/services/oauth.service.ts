@@ -20,7 +20,7 @@ const NETWORK_CONFIG: Record<SocialNetwork, ProviderOAuthConfig> = {
   LINKEDIN: {
     authorizeUrl: 'https://www.linkedin.com/oauth/v2/authorization',
     tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
-    scopes: ['openid', 'profile', 'w_member_social', 'w_organization_social', 'r_organization_social'],
+    scopes: ['openid', 'profile', 'email', 'w_member_social'],
   },
   FACEBOOK: {
     authorizeUrl: 'https://www.facebook.com/v21.0/dialog/oauth',
