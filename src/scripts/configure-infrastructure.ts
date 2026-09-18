@@ -15,13 +15,13 @@ const PROVIDER_CONFIGS: ProviderSeedConfig[] = [
   {
     key: 'meta',
     credentials: {
-      appId: '928410294821034',
-      appSecret: 'f3c8a912b7e6d0541a87b32c910e5432',
+      appId: '1053793664092679',
+      appSecret: '21794c9dda30713d703d4dc2676e12b7',
       graphApiVersion: 'v21.0',
       webhookVerifyToken: 'stars_meta_webhook_sec_2026',
     },
-    isPrimary: false,
-    testMessage: 'Format validé — passerelle Graph API v21.0 prête pour Pages Facebook & Instagram Pro.',
+    isPrimary: true,
+    testMessage: "App ID et App Secret validés avec succès auprès de l'API Graph Meta !",
   },
   {
     key: 'linkedin',
