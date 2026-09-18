@@ -52,6 +52,17 @@ export class NativeAiAdapter implements AiAdapter {
    * Builds the prompt instructing the LLM to generate the 5 STARS post variants
    */
   private buildVariantsPrompt(req: PostVariantRequest): string {
+    const isTikTok = req.network === 'TIKTOK';
+    const networkGuidance = isTikTok
+      ? `RÈGLES FORMAT TIKTOK (Script Vidéo Viral 30-60s) :
+- Conçois chaque variante comme un script vidéo dynamique prêt à être tourné.
+- Intègre des indications de réalisation entre crochets : ex [Plan face caméra dynamique], [Texte écran : chiffre clé], [B-Roll / démo].
+- Accroche (Hook) : doit stopper net le scroll dans les 3 premières secondes.
+- Script oralisé, rythmé, percutant, avec punchlines et transitions fluides.
+- CTA final orienté commentaire ou débat ("Donne ton avis en commentaire", "Abonne-toi pour la suite").`
+      : `RÈGLES IMPORTANTES :
+- Chaque variante doit être rédigée en français impeccable et adaptée aux codes de ${req.network}.`;
+
     return `Tu es le directeur éditorial exécutif de la plateforme STARS.
 Génère 5 variantes de posts très qualitatives et adaptées au réseau ${req.network} sur le sujet suivant :
 
@@ -61,8 +72,7 @@ Tonalité demandée : ${req.tone}
 ${req.brandVoiceName ? `Identité de marque (Brand Voice) : ${req.brandVoiceName}` : ''}
 ${req.sourceUrls?.length ? `Sources de référence : ${req.sourceUrls.join(', ')}` : ''}
 
-RÈGLES IMPORTANTES :
-- Chaque variante doit être rédigée en français impeccable et adaptée aux codes de ${req.network}.
+${networkGuidance}
 - Chaque variante doit traiter spécifiquement et en profondeur du sujet « ${req.dossierTitle} », en intégrant des arguments, des chiffres et des angles concrets issus de la synthèse.
 - Ne JAMAIS utiliser de phrases génériques ou de remplissage passe-partout.
 
@@ -72,7 +82,7 @@ Retourne STRICTEMENT un objet JSON contenant la clé "variants", qui est un tabl
     {
       "label": "concise" | "expert" | "executive" | "pedagogical" | "high-engagement",
       "suggestedHook": "Accroche percutante spécifique au sujet",
-      "content": "Texte complet du post, aéré avec sauts de lignes et emojis professionnels",
+      "content": "Texte complet du post ou script vidéo avec sauts de lignes et indications de mise en scène",
       "suggestedCta": "Appel à l'action incitant au commentaire ou au partage",
       "hashtags": ["#Hashtag1", "#Hashtag2", "#Hashtag3"]
     }

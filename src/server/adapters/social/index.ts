@@ -1,5 +1,5 @@
 import type { SocialConnector } from './types';
-import { LinkedInConnector, FacebookConnector, InstagramConnector, XConnector } from './real';
+import { LinkedInConnector, FacebookConnector, InstagramConnector, XConnector, TikTokConnector } from './real';
 
 export * from './types';
 
@@ -8,6 +8,7 @@ const registry: Record<SocialConnector['network'], SocialConnector> = {
   INSTAGRAM: new InstagramConnector(),
   FACEBOOK: new FacebookConnector(),
   X: new XConnector(),
+  TIKTOK: new TikTokConnector(),
 };
 
 export function getSocialConnector(network: SocialConnector['network']): SocialConnector {

@@ -4,8 +4,8 @@ import { disconnectSocialAccountAction, connectSandboxAccountAction } from './ac
 import Link from 'next/link';
 
 const NETWORKS: {
-  key: 'linkedin' | 'facebook' | 'instagram' | 'x';
-  networkEnum: 'LINKEDIN' | 'FACEBOOK' | 'INSTAGRAM' | 'X';
+  key: 'linkedin' | 'facebook' | 'instagram' | 'x' | 'tiktok';
+  networkEnum: 'LINKEDIN' | 'FACEBOOK' | 'INSTAGRAM' | 'X' | 'TIKTOK';
   label: string;
   icon: string;
   description: string;
@@ -42,6 +42,14 @@ const NETWORKS: {
     icon: '👥',
     description: 'Gestion et publication programmée sur vos Pages d’organisation.',
     color: 'border-[#1877F2]/40 bg-[#1877F2]/10 text-[#1877F2]',
+  },
+  {
+    key: 'tiktok',
+    networkEnum: 'TIKTOK',
+    label: 'TikTok for Business',
+    icon: '🎵',
+    description: 'Publication de vidéos et diffusion de scripts taillés pour la viralité.',
+    color: 'border-[#00f2fe]/40 bg-[#00f2fe]/10 text-[#00f2fe]',
   },
 ];
 
@@ -187,7 +195,7 @@ export default async function SocialSettingsPage({
           Connecter ou gérer un réseau
         </h2>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {NETWORKS.map((n) => {
             const networkAccounts = accounts.filter((a) => a.network === n.networkEnum);
             const isConnected = networkAccounts.length > 0;

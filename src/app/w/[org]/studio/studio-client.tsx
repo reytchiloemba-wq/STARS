@@ -91,6 +91,22 @@ const NETWORKS_SPECS: Record<SocialNetwork, NetworkSpec> = {
       'Format média adapté pour maximiser le taux de clics',
     ],
   },
+  TIKTOK: {
+    id: 'TIKTOK',
+    name: 'TikTok',
+    icon: '🎵',
+    brandColor: '#00F2FE',
+    glowClass: 'border-[#00F2FE] bg-[#00F2FE]/10 shadow-[0_0_20px_-5px_rgba(0,242,254,0.4)]',
+    badgeText: 'Vidéo, Script & Hook',
+    charLimit: 2200,
+    idealLength: '150 à 450 caractères (légende) + Script vidéo',
+    recommendations: [
+      'Accroche choc dès les 3 premières secondes (Hook visuel et sonore)',
+      'Script structuré avec repères de mise en scène [Plan / Texte écran]',
+      'Légende courte et percutante avec question ouverte pour les commentaires',
+      '3 à 5 hashtags de niche pour alimenter l’algorithme For You Page (FYP)',
+    ],
+  },
 };
 
 const OBJECTIVES = [

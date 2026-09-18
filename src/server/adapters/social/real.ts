@@ -218,3 +218,61 @@ export class XConnector implements SocialConnector {
     }
   }
 }
+
+export class TikTokConnector implements SocialConnector {
+  readonly network = 'TIKTOK' as const;
+  isConfigured() {
+    return true;
+  }
+
+  async publish(req: SocialPublishRequest): Promise<SocialPublishResult> {
+    if (!req.accessToken) return { success: false, errorMessage: 'Aucun jeton TikTok disponible pour ce compte.' };
+    if (req.accessToken.startsWith('sandbox_') || req.socialAccountExternalId.startsWith('sandbox_')) {
+      return { success: true, externalPostId: `tiktok_video_sandbox_${Date.now()}` };
+    }
+
+    try {
+      const res = await fetch('https://open.tiktokapis.com/v2/post/publish/content/init/', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${req.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          post_info: {
+            title: req.content.slice(0, 150),
+            description: req.content,
+            privacy_level: 'PUBLIC_TO_EVERYONE',
+            disable_duet: false,
+            disable_stitch: false,
+            disable_comment: false,
+          },
+          source_info: {
+            source: 'PULL_FROM_URL',
+            video_url: req.mediaUrls[0] || 'https://stars-ap.com/assets/video-template.mp4',
+          },
+        }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+
+      const json = (await res.json().catch(() => null)) as {
+        data?: { publish_id?: string };
+        error?: { message?: string; code?: string };
+      } | null;
+
+      if (!res.ok || !json?.data?.publish_id) {
+        return {
+          success: false,
+          errorMessage: `TikTok a refusé la publication : ${json?.error?.message ?? `HTTP ${res.status}`}`,
+        };
+      }
+
+      return { success: true, externalPostId: json.data.publish_id };
+    } catch (err) {
+      return {
+        success: false,
+        errorMessage: `Erreur réseau TikTok : ${err instanceof Error ? err.message : 'inconnue'}`,
+      };
+    }
+  }
+}

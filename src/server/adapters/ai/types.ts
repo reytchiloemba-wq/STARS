@@ -1,7 +1,7 @@
 export interface PostVariantRequest {
   dossierTitle: string;
   dossierSummary: string;
-  network: 'LINKEDIN' | 'INSTAGRAM' | 'FACEBOOK' | 'X';
+  network: 'LINKEDIN' | 'INSTAGRAM' | 'FACEBOOK' | 'X' | 'TIKTOK';
   tone: string;
   brandVoiceName?: string;
   sourceUrls?: string[];

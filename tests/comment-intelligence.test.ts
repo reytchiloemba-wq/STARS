@@ -34,17 +34,17 @@ describe('STARS Comment Intelligence Hub & Governance', () => {
       const business = getPlan('business');
       const enterprise = getPlan('enterprise');
 
-      expect(discovery.quotas.commentsPerMonth).toBe(25);
-      expect(discovery.quotas.commentAiSuggestionsPerMonth).toBe(5);
+      expect(discovery.quotas.commentsPerMonth).toBe(50);
+      expect(discovery.quotas.commentAiSuggestionsPerMonth).toBe(10);
 
-      expect(creator.quotas.commentsPerMonth).toBe(500);
-      expect(creator.quotas.commentAiSuggestionsPerMonth).toBe(150);
+      expect(creator.quotas.commentsPerMonth).toBe(1000);
+      expect(creator.quotas.commentAiSuggestionsPerMonth).toBe(250);
 
-      expect(professional.quotas.commentsPerMonth).toBe(3000);
-      expect(professional.quotas.commentAiSuggestionsPerMonth).toBe(1000);
+      expect(professional.quotas.commentsPerMonth).toBe(4000);
+      expect(professional.quotas.commentAiSuggestionsPerMonth).toBe(1200);
 
-      expect(business.quotas.commentsPerMonth).toBe(15000);
-      expect(business.quotas.commentAiSuggestionsPerMonth).toBe(5000);
+      expect(business.quotas.commentsPerMonth).toBe(20000);
+      expect(business.quotas.commentAiSuggestionsPerMonth).toBe(6000);
 
       expect(enterprise.quotas.commentsPerMonth).toBe(-1); // Sur-mesure
       expect(enterprise.quotas.commentAiSuggestionsPerMonth).toBe(-1);

@@ -25,6 +25,7 @@ const SANDBOX_NAMES: Record<SocialNetwork, string> = {
   X: 'Profil Officiel X / Twitter (@stars_media)',
   INSTAGRAM: 'Compte Instagram Professionnel (@stars_intelligence)',
   FACEBOOK: 'HORUS Business Automation Engineered (Page Facebook)',
+  TIKTOK: 'Compte Officiel TikTok (@stars_creators)',
 };
 
 export async function connectSandboxAccountAction(orgSlug: string, network: SocialNetwork) {

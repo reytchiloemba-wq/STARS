@@ -3,7 +3,7 @@ import { requireTenantPermission } from '@/lib/tenant';
 import { startOAuthFlow, OAuthNotConfiguredError } from '@/server/services/oauth.service';
 import type { SocialNetwork } from '@prisma/client';
 
-const VALID_NETWORKS: SocialNetwork[] = ['LINKEDIN', 'FACEBOOK', 'INSTAGRAM', 'X'];
+const VALID_NETWORKS: SocialNetwork[] = ['LINKEDIN', 'FACEBOOK', 'INSTAGRAM', 'X', 'TIKTOK'];
 
 /**
  * The redirect_uri sent to a social provider MUST be a fixed value that

@@ -366,6 +366,111 @@ export default function NetworkPreview({
             </div>
           </div>
         )}
+
+        {/* TIKTOK */}
+        {network === 'TIKTOK' && (
+          <div className="relative overflow-hidden rounded-2xl border border-neutral-800 bg-[#0f0f0f] text-white shadow-2xl">
+            {/* Visual background / 9:16 Video Frame */}
+            <div className="relative aspect-[9/14] sm:aspect-[9/13] w-full overflow-hidden bg-gradient-to-b from-neutral-900 via-neutral-950 to-black flex items-center justify-center">
+              {imageUrl ? (
+                <>
+                  <img src={imageUrl} alt="TikTok visual" className="h-full w-full object-cover brightness-[0.75]" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/90" />
+                </>
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#00f2fe]/10 via-[#4facfe]/5 to-black">
+                  <div className="relative mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-neutral-900/80 border border-white/10 shadow-xl backdrop-blur-md">
+                    <span className="text-3xl">🎵</span>
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff0050] opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-[#ff0050]"></span>
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">Format TikTok (9:16)</span>
+                  <span className="text-[11px] text-neutral-400 mt-1 max-w-[200px]">Script vidéo rythmé conçu pour maximiser la rétention et l&apos;algorithme</span>
+                </div>
+              )}
+
+              {/* TikTok Right Interactive Sidebar */}
+              <div className="absolute right-3 bottom-16 flex flex-col items-center gap-4 z-10">
+                {/* Profile Icon with + button */}
+                <div className="relative flex flex-col items-center mb-1">
+                  <div className="h-10 w-10 rounded-full border-2 border-white bg-gradient-to-tr from-[#00f2fe] to-[#ff0050] p-0.5 shadow-lg">
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-black text-xs font-bold text-white">
+                      {orgName.charAt(0)}
+                    </div>
+                  </div>
+                  <span className="absolute -bottom-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#ff0050] text-[10px] font-bold text-white shadow">
+                    +
+                  </span>
+                </div>
+
+                {/* Like */}
+                <button type="button" className="flex flex-col items-center gap-0.5 text-white/90 hover:text-[#ff0050] transition">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-md text-base">
+                    ❤️
+                  </div>
+                  <span className="text-[10px] font-bold">2.4k</span>
+                </button>
+
+                {/* Comment */}
+                <button type="button" className="flex flex-col items-center gap-0.5 text-white/90 hover:text-[#00f2fe] transition">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-md text-base">
+                    💬
+                  </div>
+                  <span className="text-[10px] font-bold">148</span>
+                </button>
+
+                {/* Bookmark */}
+                <button type="button" className="flex flex-col items-center gap-0.5 text-white/90 hover:text-amber-400 transition">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-md text-base">
+                    🔖
+                  </div>
+                  <span className="text-[10px] font-bold">420</span>
+                </button>
+
+                {/* Share */}
+                <button type="button" className="flex flex-col items-center gap-0.5 text-white/90 transition">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-md text-base">
+                    ↗️
+                  </div>
+                  <span className="text-[10px] font-bold">89</span>
+                </button>
+
+                {/* Rotating Sound Disc */}
+                <div className="h-8 w-8 rounded-full border-2 border-neutral-700 bg-black flex items-center justify-center shadow-lg animate-spin" style={{ animationDuration: '4s' }}>
+                  <span className="text-[10px]">🎵</span>
+                </div>
+              </div>
+
+              {/* TikTok Bottom Content & Sound Bar */}
+              <div className="absolute inset-x-0 bottom-0 p-4 pr-16 bg-gradient-to-t from-black via-black/80 to-transparent z-10 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-white">@{orgName.toLowerCase().replace(/\s+/g, '_')}</span>
+                  <span className="rounded-full bg-[#00f2fe]/20 px-1.5 py-0.2 text-[9px] font-bold text-[#00f2fe]">STARS</span>
+                </div>
+
+                <div className="text-xs leading-relaxed text-neutral-100 whitespace-pre-line max-h-36 overflow-y-auto pr-1">
+                  {displayContent}
+                  {!isExpanded && content.length > 380 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsExpanded(true)}
+                      className="ml-1 font-semibold text-[#00f2fe] hover:underline"
+                    >
+                      ...plus
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 text-[11px] text-neutral-300">
+                  <span className="text-[10px]">♫</span>
+                  <span className="truncate font-medium">Son original - @{orgName.toLowerCase().replace(/\s+/g, '_')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

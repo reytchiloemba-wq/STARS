@@ -37,11 +37,19 @@ const NETWORK_CONFIG: Record<SocialNetwork, ProviderOAuthConfig> = {
     tokenUrl: 'https://api.twitter.com/2/oauth2/token',
     scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
   },
+  TIKTOK: {
+    authorizeUrl: 'https://www.tiktok.com/v2/auth/authorize/',
+    tokenUrl: 'https://open.tiktokapis.com/v2/oauth/token/',
+    scopes: ['user.info.basic', 'video.publish', 'video.upload'],
+  },
 };
 
 // Meta (Facebook/Instagram) OAuth apps share one provider row keyed 'meta'.
 function providerKeyFor(network: SocialNetwork): string {
-  return network === 'X' ? 'x' : network === 'LINKEDIN' ? 'linkedin' : 'meta';
+  if (network === 'X') return 'x';
+  if (network === 'LINKEDIN') return 'linkedin';
+  if (network === 'TIKTOK') return 'tiktok';
+  return 'meta';
 }
 
 export class OAuthNotConfiguredError extends Error {
@@ -175,6 +183,10 @@ export async function startOAuthFlow(
     scope: scopes.join(' '),
   });
 
+  if (network === 'TIKTOK') {
+    params.set('client_key', clientId);
+  }
+
   if (network === 'X') {
     params.set('code_challenge', codeChallenge);
     params.set('code_challenge_method', 'S256');
@@ -261,6 +273,10 @@ export async function completeOAuthFlow(
     code,
     redirect_uri: stateRow.redirectUri,
   };
+
+  if (network === 'TIKTOK') {
+    tokenParams.client_key = clientId;
+  }
 
   if (network !== 'FACEBOOK' && network !== 'INSTAGRAM') {
     tokenParams.grant_type = 'authorization_code';
@@ -429,6 +445,20 @@ export async function completeOAuthFlow(
         const meData = (await meRes.json()) as { data?: { id?: string; name?: string; username?: string } };
         if (meData.data?.id) externalId = meData.data.id;
         if (meData.data?.name) displayName = `${meData.data.name} (@${meData.data.username || 'x'})`;
+      }
+    } catch {
+      // keep fallback
+    }
+  } else if (network === 'TIKTOK') {
+    try {
+      const userRes = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name', {
+        headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (userRes.ok) {
+        const userData = (await userRes.json()) as { data?: { user?: { open_id?: string; display_name?: string } } };
+        if (userData.data?.user?.open_id) externalId = userData.data.user.open_id;
+        if (userData.data?.user?.display_name) displayName = `${userData.data.user.display_name} (@tiktok)`;
       }
     } catch {
       // keep fallback

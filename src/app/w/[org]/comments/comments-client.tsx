@@ -94,6 +94,13 @@ const NETWORK_CONFIG: Record<
     border: 'border-[#1877F2]/40',
     bg: 'bg-[#1877F2]/10',
   },
+  TIKTOK: {
+    label: 'TikTok',
+    icon: '🎵',
+    color: '#00F2FE',
+    border: 'border-[#00F2FE]/40',
+    bg: 'bg-[#00F2FE]/10',
+  },
 };
 
 const SENTIMENT_CONFIG: Record<
