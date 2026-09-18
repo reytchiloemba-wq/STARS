@@ -36,7 +36,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
   {
     question: 'Quels réseaux sont pris en charge ?',
-    answer: 'LinkedIn, Instagram, Facebook et X, via leurs API officielles et un flux OAuth propre à votre organisation.',
+    answer: 'LinkedIn, TikTok, Instagram, Facebook et X, via leurs API officielles et un flux OAuth sécurisé propre à votre organisation.',
   },
   {
     question: 'Puis-je annuler à tout moment ?',

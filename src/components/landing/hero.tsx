@@ -9,7 +9,7 @@ const STEPS = [
   { label: 'Thèse', content: 'Gains de productivité record (+38%) et émergence de nouveaux métiers à haute valeur ajoutée.', badge: 'Analyse' },
   { label: 'Antithèse', content: 'Tension sur les transitions professionnelles et nécessité d’un cadre d’audit éthique.', badge: 'Contradictoire' },
   { label: 'Studio Brand Voice', content: '5 variantes générées avec le ton exécutif de votre marque.', badge: 'IA Éditoriale' },
-  { label: 'Canaux connectés', content: 'LinkedIn (★), X/Twitter, Instagram Pro & Facebook Pages prêts.', badge: 'Multi-réseaux' },
+  { label: 'Canaux connectés', content: 'LinkedIn (★), TikTok Video, X/Twitter, Instagram & Facebook Pages prêts.', badge: '5 Réseaux' },
   { label: 'Statut de validation', content: '✓ Revue humaine validée · Prêt à publier ou programmer', badge: 'Gouvernance' },
 ];
 
@@ -57,7 +57,7 @@ export default function LandingHero() {
             </h1>
 
             <p className="mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg sm:leading-relaxed">
-              STARS surveille les sources mondiales, confronte rigoureusement les faits et les points de vue contradictoires, applique votre identité éditoriale et diffuse des analyses d&apos;impact sur LinkedIn, Instagram, Facebook et X.
+              STARS surveille les sources mondiales, confronte rigoureusement les faits et les points de vue contradictoires, applique votre identité éditoriale et diffuse des analyses d&apos;impact sur LinkedIn, TikTok, Instagram, Facebook et X.
             </p>
 
             {/* CTAs */}

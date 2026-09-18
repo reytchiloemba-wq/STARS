@@ -1,5 +1,6 @@
 const NETWORKS = [
   { name: 'LinkedIn', color: 'border-[#0A66C2]/40 bg-[#0A66C2]/10 text-[#0A66C2]', icon: '💼' },
+  { name: 'TikTok Video', color: 'border-[#00f2fe]/40 bg-[#00f2fe]/10 text-[#00f2fe]', icon: '🎵' },
   { name: 'X / Twitter', color: 'border-white/30 bg-white/10 text-white', icon: '𝕏' },
   { name: 'Instagram Pro', color: 'border-[#E4405F]/40 bg-[#E4405F]/10 text-[#E4405F]', icon: '📸' },
   { name: 'Facebook Pages', color: 'border-[#1877F2]/40 bg-[#1877F2]/10 text-[#1877F2]', icon: '👥' },
@@ -14,9 +15,9 @@ const FEATURES = [
   },
   {
     icon: '⚡',
-    title: '5 Variantes Instantanées',
-    description: 'Concise, experte, dirigeante, pédagogique ou forte en engagement. Comparez, éditez et fusionnez en un clic avant publication.',
-    tag: 'Multi-Angles',
+    title: '5 Variantes & Scripts Vidéo',
+    description: 'Concise, experte, dirigeante, pédagogique ou script vidéo viral TikTok. Comparez, éditez et programmez en un clic avant diffusion.',
+    tag: 'Multi-Formats',
   },
   {
     icon: '🛡️',

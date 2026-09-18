@@ -24,7 +24,7 @@ import { FAQ_ITEMS } from '@/config/faq';
 export const metadata: Metadata = {
   title: 'STARS — Veille, analyse contradictoire et publication multiréseaux',
   description:
-    "STARS surveille l'actualité mondiale, confronte les sources et les experts, génère vos contenus et les publie sur LinkedIn, Instagram, Facebook et X.",
+    "STARS surveille l'actualité mondiale, confronte les sources et les experts, génère vos contenus et les publie sur LinkedIn, TikTok, Instagram, Facebook et X.",
   openGraph: {
     title: 'STARS — Smart Topics. Brighter Ideas.',
     description: 'From the World to Your Voice.',

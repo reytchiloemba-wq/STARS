@@ -36,14 +36,22 @@ export default function LandingPricing({ foundersPromo }: { foundersPromo: Promo
     strategicCount * CREDIT_COSTS.ANALYSIS_STRATEGIC +
     imagesCount * CREDIT_COSTS.AI_ILLUSTRATION;
 
-  const recommendedPlan =
-    simulatedSicTotal <= 10
+  const PLAN_FRIENDLY_NAMES: Record<PlanKey, string> = {
+    discovery: 'Découverte (Gratuit)',
+    creator: 'Créateur (29 €/mois)',
+    professional: 'Professionnel (89 €/mois)',
+    business: 'Business (249 €/mois)',
+    enterprise: 'Sur-Mesure',
+  };
+
+  const recommendedPlan: PlanKey =
+    simulatedSicTotal <= 25
       ? 'discovery'
-      : simulatedSicTotal <= 100
+      : simulatedSicTotal <= 120
         ? 'creator'
-        : simulatedSicTotal <= 350
+        : simulatedSicTotal <= 400
           ? 'professional'
-          : simulatedSicTotal <= 1200
+          : simulatedSicTotal <= 1500
             ? 'business'
             : 'enterprise';
 
@@ -319,13 +327,13 @@ export default function LandingPricing({ foundersPromo }: { foundersPromo: Promo
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-accent-cyan/30 bg-accent-cyan/10 p-4 text-xs">
             <span className="text-white">
-              Forfait recommandé pour votre profil : <strong className="uppercase text-accent-cyan">{recommendedPlan}</strong>
+              Forfait recommandé pour votre profil : <strong className="text-accent-cyan font-bold">{PLAN_FRIENDLY_NAMES[recommendedPlan]}</strong>
             </span>
             <Link
-              href="/register"
+              href={recommendedPlan === 'enterprise' ? '/contact-sales' : '/register'}
               className="rounded-lg bg-start-gradient px-4 py-2 font-bold text-white shadow hover:scale-[1.02] transition-transform"
             >
-              Choisir {recommendedPlan} →
+              Choisir ce forfait →
             </Link>
           </div>
         </div>

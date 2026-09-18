@@ -23,6 +23,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
     title: 'Réseaux Sociaux Supportés',
     links: [
       { label: 'LinkedIn Enterprise', href: 'https://www.linkedin.com/company/stars-platform' },
+      { label: 'TikTok for Business', href: 'https://www.tiktok.com/@stars_creators' },
       { label: 'X / Twitter v2', href: 'https://x.com/stars_platform' },
       { label: 'Instagram Professionnel', href: 'https://www.instagram.com/stars_platform' },
       { label: 'Facebook Pages Pro', href: 'https://www.facebook.com/starsplatform' },
@@ -41,6 +42,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
 
 const SOCIAL_ICONS = [
   { label: 'LinkedIn', href: 'https://www.linkedin.com/company/stars-platform', icon: '💼' },
+  { label: 'TikTok', href: 'https://www.tiktok.com/@stars_creators', icon: '🎵' },
   { label: 'X', href: 'https://x.com/stars_platform', icon: '𝕏' },
   { label: 'Instagram', href: 'https://www.instagram.com/stars_platform', icon: '📸' },
   { label: 'Facebook', href: 'https://www.facebook.com/starsplatform', icon: '👥' },
