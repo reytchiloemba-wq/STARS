@@ -11,39 +11,62 @@ export default async function RadarPage({
 }) {
   const { org } = await params;
   const { topic: queryTopic } = await searchParams;
-  await resolveTenant(org);
+  const ctx = await resolveTenant(org);
 
-  const weakSignals = await RadarService.getWeakSignals();
+  const weakSignals = await RadarService.getWeakSignals(ctx.organization.id);
   const currentTopic = queryTopic || 'Réglementation et souveraineté des modèles IA';
-  const narrativeData = await RadarService.getNarrativeMap(currentTopic);
+  const narrativeData = await RadarService.getNarrativeMap(currentTopic, ctx.organization.id);
+
+  const hasRealSignals = weakSignals.some((ws) => ws.isDemoData === false);
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Radar Mondial & Signaux Faibles</h1>
-          <p className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-foreground">Radar Mondial &amp; Signaux Faibles</h1>
+            {hasRealSignals ? (
+              <span className="rounded-full bg-success/15 border border-success/40 px-2.5 py-0.5 text-xs font-semibold text-success">
+                Moteur Firecrawl Actif
+              </span>
+            ) : (
+              <span className="demo-badge shrink-0">Démonstration</span>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
             Anticipez les ruptures, comparez les prismes régionaux et identifiez les angles originaux non saturés.
           </p>
         </div>
-        <span className="demo-badge shrink-0">Démonstration</span>
+
+        <Link
+          href={`/w/${org}/sources`}
+          className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-lg border border-accent-cyan/40 bg-accent-cyan/10 px-3 py-1.5 text-xs font-semibold text-accent-cyan hover:bg-accent-cyan/20 transition"
+        >
+          <span>⚡</span>
+          <span>Ingérer des sources avec Firecrawl</span>
+        </Link>
       </div>
-      <p className="-mt-6 text-xs text-muted-foreground">
-        Ce module illustre le rendu final. Il n&apos;est pas encore connecté à un pipeline de veille réel — voir{' '}
-        <a href="/admin/infrastructure" className="underline">
-          Infrastructure &amp; Connexions
-        </a>
-        .
-      </p>
+
+      {!hasRealSignals && (
+        <p className="-mt-4 text-xs text-muted-foreground">
+          Ce module affiche actuellement des signaux de démonstration. Lancez une ingestion dans{' '}
+          <Link href={`/w/${org}/sources`} className="underline text-accent-cyan">
+            Gouvernance des Sources
+          </Link>{' '}
+          pour alimenter le radar avec des articles réels en direct.
+        </p>
+      )}
 
       {/* Signaux faibles détectés */}
       <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xl">📡</span>
-            <h2 className="text-base font-bold text-foreground">Signaux Faibles & Détection de Ruptures</h2>
+            <h2 className="text-base font-bold text-foreground">Signaux Faibles &amp; Détection de Ruptures</h2>
           </div>
-          <span className="text-xs text-muted-foreground">Exemple illustratif</span>
+          <span className="text-xs text-muted-foreground">
+            {hasRealSignals ? 'Alimenté par Firecrawl' : 'Exemple illustratif'}
+          </span>
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -80,12 +103,22 @@ export default async function RadarPage({
                 </div>
 
                 <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3 text-xs">
-                  <div className="flex gap-1">
-                    {ws.relatedEntities.map((ent, idx) => (
-                      <span key={idx} className="rounded bg-surface px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                        {ent}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {ws.sourceName && (
+                      <span className="rounded bg-accent-cyan/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent-cyan">
+                        {ws.sourceName}
                       </span>
-                    ))}
+                    )}
+                    {ws.sourceUrl && (
+                      <a
+                        href={ws.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-muted-foreground hover:underline"
+                      >
+                        Source ↗
+                      </a>
+                    )}
                   </div>
                   <Link
                     href={`/w/${org}/studio?title=${encodeURIComponent(ws.title)}&summary=${encodeURIComponent(ws.editorialOpportunity)}`}
