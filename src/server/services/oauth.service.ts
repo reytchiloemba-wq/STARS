@@ -117,20 +117,30 @@ export async function startOAuthFlow(
   const clientId = creds.clientId ?? creds.appId;
   if (!clientId) throw new OAuthNotConfiguredError(network);
 
-  // Détection des erreurs de saisie inter-plateformes (ex: clé Twitter/X collée dans LinkedIn)
-  if (network === 'LINKEDIN' && (clientId.includes(':ci') || clientId.includes(':1:ci'))) {
-    throw new OAuthNotConfiguredError(
-      network,
-      "L'identifiant LinkedIn configuré dans le Cockpit Super-Admin est invalide : une clé API Twitter/X (« " +
-        clientId.slice(0, 16) +
-        "... ») y a été renseignée par erreur. Veuillez renseigner le vrai Client ID LinkedIn (obtenu sur https://www.linkedin.com/developers/apps) dans /admin/infrastructure, ou activer un compte Sandbox ci-dessous.",
-    );
+  // Détection des erreurs de saisie inter-plateformes (ex: clé Twitter/X ou Meta collée dans LinkedIn)
+  if (network === 'LINKEDIN') {
+    if (clientId.includes(':ci') || clientId.includes(':1:ci')) {
+      throw new OAuthNotConfiguredError(
+        network,
+        "L'identifiant configuré pour LinkedIn (« " +
+          clientId.slice(0, 16) +
+          "... ») est une clé API Twitter/X. Veuillez renseigner le vrai Client ID LinkedIn (obtenu sur https://www.linkedin.com/developers/apps) dans /admin/infrastructure, ou utiliser le compte Sandbox ci-dessous.",
+      );
+    }
+    if (/^\d{14,18}$/.test(clientId)) {
+      throw new OAuthNotConfiguredError(
+        network,
+        "L'identifiant configuré pour LinkedIn (« " +
+          clientId +
+          " ») est un App ID Meta / Facebook. Veuillez renseigner le véritable Client ID de votre application LinkedIn Developer (sur https://www.linkedin.com/developers/apps) dans /admin/infrastructure, ou utiliser le compte Sandbox ci-dessous.",
+      );
+    }
   }
 
   if (integration.status === 'ERROR') {
     throw new OAuthNotConfiguredError(
       network,
-      `${network} est actuellement marqué en erreur dans le Cockpit Super-Admin (${integration.lastTestMessage ?? 'identifiants non vérifiés'}). Veuillez corriger les identifiants dans /admin/infrastructure ou utiliser le mode Sandbox ci-dessous.`,
+      `${network} est actuellement en statut d'erreur dans le Cockpit Super-Admin (${integration.lastTestMessage ?? 'identifiants non vérifiés'}). Veuillez configurer les identifiants officiels dans /admin/infrastructure ou utiliser le compte Sandbox ci-dessous.`,
     );
   }
 
