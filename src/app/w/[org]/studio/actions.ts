@@ -160,6 +160,22 @@ export async function attachIllustrationAction(
   }
 }
 
+export async function detachIllustrationAction(
+  orgSlug: string,
+  draftId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ctx = await resolveTenant(orgSlug);
+    await EditorialService.detachIllustration({
+      organizationId: ctx.organization.id,
+      draftId,
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Erreur lors du détachement du visuel' };
+  }
+}
+
 export async function generateIllustrationAction(
   orgSlug: string,
   params: {

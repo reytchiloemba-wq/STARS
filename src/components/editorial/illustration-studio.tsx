@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { MediaKind } from '@prisma/client';
 
 export interface SelectedMedia {
@@ -14,16 +14,23 @@ export interface SelectedMedia {
   licenseNote?: string;
 }
 
-const STOCK_IMAGES = [
+interface StockImage {
+  url: string;
+  title: string;
+  license: string;
+  category: string;
+}
+
+const STOCK_IMAGES: StockImage[] = [
   {
     url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200&auto=format&fit=crop',
     title: 'Technologie & Données mondiales',
     license: 'Licence Commerciale Unsplash',
-    category: 'Data & Cloud',
+    category: 'Tech & IA',
   },
   {
     url: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?q=80&w=1200&auto=format&fit=crop',
-    title: 'Finance & Marchés mondiaux',
+    title: 'Finance & Marchés boursiers',
     license: 'Licence Commerciale Unsplash',
     category: 'Finance',
   },
@@ -51,7 +58,45 @@ const STOCK_IMAGES = [
     license: 'Licence Commerciale Unsplash',
     category: 'Climat & RSE',
   },
+  {
+    url: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1200&auto=format&fit=crop',
+    title: 'Cybersécurité & Données souveraines',
+    license: 'Licence Commerciale Unsplash',
+    category: 'Tech & IA',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?q=80&w=1200&auto=format&fit=crop',
+    title: 'Graphiques boursiers & Analyse quantitative',
+    license: 'Licence Commerciale Unsplash',
+    category: 'Finance',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200&auto=format&fit=crop',
+    title: 'Gouvernance & Réunion exécutive',
+    license: 'Licence Commerciale Unsplash',
+    category: 'Leadership',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?q=80&w=1200&auto=format&fit=crop',
+    title: 'Énergie solaire & Réseaux renouvelables',
+    license: 'Licence Commerciale Unsplash',
+    category: 'Climat & RSE',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=1200&auto=format&fit=crop',
+    title: 'Ingénierie avancée & Robotique',
+    license: 'Licence Commerciale Unsplash',
+    category: 'Industrie',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=1200&auto=format&fit=crop',
+    title: 'Recherche médicale & Diagnostic clinique',
+    license: 'Licence Commerciale Unsplash',
+    category: 'Santé & Bio',
+  },
 ];
+
+const STOCK_CATEGORIES = ['Tous', 'Tech & IA', 'Finance', 'Leadership', 'Industrie', 'Santé & Bio', 'Climat & RSE'];
 
 const AI_PRESET_PROMPTS = [
   'Flux de données mondiales et intelligence décisionnelle sur fond sombre élégant, style néo-éditorial',
@@ -81,6 +126,28 @@ export default function IllustrationStudio({
   const [customUrl, setCustomUrl] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Recherche & filtres stock
+  const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Drag & drop upload state
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadFileName, setUploadFileName] = useState<string | null>(null);
+
+  // Modal plein écran pour zoom HD
+  const [previewZoomUrl, setPreviewZoomUrl] = useState<string | null>(null);
+
+  const filteredStock = useMemo(() => {
+    return STOCK_IMAGES.filter((img) => {
+      const matchCat = selectedCategory === 'Tous' || img.category === selectedCategory;
+      const matchQuery =
+        !searchQuery.trim() ||
+        img.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        img.category.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchCat && matchQuery;
+    });
+  }, [selectedCategory, searchQuery]);
 
   function selectPreset(preset: string) {
     setAiPrompt(preset);
@@ -132,6 +199,42 @@ export default function IllustrationStudio({
     }
   }
 
+  function handleFileSelect(file: File) {
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Format de fichier non pris en charge. Veuillez choisir une image (PNG, JPEG, WebP, GIF).');
+      return;
+    }
+    setErrorMessage(null);
+    setUploadFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const dataUrl = evt.target?.result as string;
+      if (dataUrl) {
+        onSelectMedia({
+          url: dataUrl,
+          kind: 'USER_UPLOAD',
+          altText: file.name.replace(/\.[^/.]+$/, ''),
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleCustomUrlApply() {
+    const clean = customUrl.trim();
+    if (!clean) return;
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      setErrorMessage("L'URL doit commencer par http:// ou https://");
+      return;
+    }
+    setErrorMessage(null);
+    onSelectMedia({
+      url: clean,
+      kind: 'USER_UPLOAD',
+      altText: 'Visuel importé par URL',
+    });
+  }
+
   return (
     <div className="glass-panel rounded-2xl p-6 shadow-sm border border-border/80">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -148,7 +251,7 @@ export default function IllustrationStudio({
           <button
             type="button"
             onClick={() => onSelectMedia(null)}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-danger transition hover:underline"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger transition hover:bg-danger/20"
           >
             <span>🗑️</span>
             <span>Retirer le visuel</span>
@@ -180,7 +283,7 @@ export default function IllustrationStudio({
           }`}
         >
           <span>📷</span>
-          <span>Banque Haute Résolution</span>
+          <span>Banque Haute Résolution ({STOCK_IMAGES.length})</span>
         </button>
         <button
           type="button"
@@ -210,8 +313,14 @@ export default function IllustrationStudio({
                 setAiPrompt(e.target.value);
                 if (errorMessage) setErrorMessage(null);
               }}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  handleGenerateAi();
+                }
+              }}
               rows={2}
-              placeholder="Décrivez l'illustration souhaitée (ex: Réseau quantique et flux de données souveraines sous un angle éditorial épuré)..."
+              placeholder="Décrivez l'illustration souhaitée (ex: Réseau quantique et flux de données souveraines sous un angle éditorial épuré)... [Raccourci : ⌘ + Entrée]"
               className="mt-1.5 w-full rounded-xl border border-border bg-surface-raised/90 p-3 text-xs text-white outline-none transition focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan/30 font-sans"
             />
 
@@ -240,7 +349,7 @@ export default function IllustrationStudio({
                   onClick={() => setAspectRatio('16:9')}
                   className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2 text-[11px] font-medium transition ${
                     aspectRatio === '16:9'
-                      ? 'border-accent-cyan bg-accent-cyan/15 text-accent-cyan'
+                      ? 'border-accent-cyan bg-accent-cyan/15 text-accent-cyan font-bold'
                       : 'border-border bg-surface-raised text-muted-foreground hover:text-white'
                   }`}
                 >
@@ -252,7 +361,7 @@ export default function IllustrationStudio({
                   onClick={() => setAspectRatio('1:1')}
                   className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2 text-[11px] font-medium transition ${
                     aspectRatio === '1:1'
-                      ? 'border-accent-cyan bg-accent-cyan/15 text-accent-cyan'
+                      ? 'border-accent-cyan bg-accent-cyan/15 text-accent-cyan font-bold'
                       : 'border-border bg-surface-raised text-muted-foreground hover:text-white'
                   }`}
                 >
@@ -264,7 +373,7 @@ export default function IllustrationStudio({
                   onClick={() => setAspectRatio('4:5')}
                   className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2 text-[11px] font-medium transition ${
                     aspectRatio === '4:5'
-                      ? 'border-accent-cyan bg-accent-cyan/15 text-accent-cyan'
+                      ? 'border-accent-cyan bg-accent-cyan/15 text-accent-cyan font-bold'
                       : 'border-border bg-surface-raised text-muted-foreground hover:text-white'
                   }`}
                 >
@@ -276,7 +385,7 @@ export default function IllustrationStudio({
                   onClick={() => setAspectRatio('9:16')}
                   className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2 text-[11px] font-medium transition ${
                     aspectRatio === '9:16'
-                      ? 'border-accent-cyan bg-accent-cyan/15 text-accent-cyan'
+                      ? 'border-accent-cyan bg-accent-cyan/15 text-accent-cyan font-bold'
                       : 'border-border bg-surface-raised text-muted-foreground hover:text-white'
                   }`}
                 >
@@ -318,12 +427,21 @@ export default function IllustrationStudio({
                 </div>
                 <span className="text-[10px] text-muted-foreground">Format {aspectRatio}</span>
               </div>
-              <div className="relative overflow-hidden rounded-xl border border-border/80 bg-black/40">
+              <div
+                onClick={() => setPreviewZoomUrl(selectedMedia.url)}
+                className="group relative cursor-pointer overflow-hidden rounded-xl border border-border/80 bg-black/40 text-center"
+                title="Cliquer pour agrandir en haute définition"
+              >
                 <img
                   src={selectedMedia.url}
                   alt={selectedMedia.altText || 'Illustration IA'}
-                  className="max-h-64 w-full object-contain"
+                  className="max-h-64 w-full object-contain transition duration-300 group-hover:scale-[1.02]"
                 />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
+                  <span className="rounded-xl bg-black/80 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-xs">
+                    🔍 Agrandir en HD
+                  </span>
+                </div>
               </div>
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                 <span className="truncate max-w-sm">Alt : {selectedMedia.altText}</span>
@@ -366,72 +484,166 @@ export default function IllustrationStudio({
         </div>
       )}
 
-      {/* Onglet Stock */}
+      {/* Onglet Stock avec recherche & filtres */}
       {tab === 'STOCK' && (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {STOCK_IMAGES.map((img, i) => (
-            <div
-              key={i}
-              onClick={() =>
-                onSelectMedia({
-                  url: img.url,
-                  kind: 'STOCK_IMAGE',
-                  altText: img.title,
-                })
-              }
-              className={`group cursor-pointer overflow-hidden rounded-xl border p-1 transition ${
-                selectedMedia?.url === img.url
-                  ? 'border-accent-cyan ring-2 ring-accent-cyan/30 bg-accent-cyan/10'
-                  : 'border-border/80 bg-surface-raised/60 hover:border-accent-cyan/50 hover:bg-surface-raised'
-              }`}
-            >
-              <div className="relative overflow-hidden rounded-lg">
-                <img src={img.url} alt={img.title} className="h-28 w-full object-cover transition duration-300 group-hover:scale-105" />
-                <span className="absolute top-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-xs">
-                  {img.category}
-                </span>
-              </div>
-              <div className="mt-1.5 px-1 pb-1">
-                <div className="truncate text-[11px] font-semibold text-white">{img.title}</div>
-                <div className="text-[10px] text-muted-foreground">{img.license}</div>
-              </div>
+        <div className="mt-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher par mot-clé (ex: finance, tech, santé, climat)..."
+                className="w-full rounded-xl border border-border bg-surface-raised/90 pl-8 pr-3 py-2 text-xs text-white outline-none focus:border-accent-cyan"
+              />
+              <span className="absolute left-2.5 top-2.5 text-xs text-muted-foreground">🔍</span>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2.5 text-xs text-muted-foreground hover:text-white"
+                >
+                  ✕
+                </button>
+              )}
             </div>
-          ))}
+          </div>
+
+          {/* Catégories filtres */}
+          <div className="flex flex-wrap gap-1.5 overflow-x-auto pb-1">
+            {STOCK_CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
+                  selectedCategory === cat
+                    ? 'bg-accent-cyan text-black'
+                    : 'bg-surface-raised border border-border/80 text-muted-foreground hover:text-white hover:border-accent-cyan/50'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {filteredStock.length === 0 ? (
+            <div className="rounded-xl border border-border/60 bg-surface-raised/30 p-8 text-center">
+              <p className="text-xs text-muted-foreground">Aucun visuel trouvé pour &quot;{searchQuery}&quot;.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('Tous');
+                }}
+                className="mt-2 text-xs text-accent-cyan font-semibold hover:underline"
+              >
+                Réinitialiser la recherche
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {filteredStock.map((img, i) => (
+                <div
+                  key={i}
+                  onClick={() =>
+                    onSelectMedia({
+                      url: img.url,
+                      kind: 'STOCK_IMAGE',
+                      altText: img.title,
+                      licenseNote: img.license,
+                    })
+                  }
+                  className={`group cursor-pointer overflow-hidden rounded-xl border p-1 transition ${
+                    selectedMedia?.url === img.url
+                      ? 'border-accent-cyan ring-2 ring-accent-cyan/30 bg-accent-cyan/10'
+                      : 'border-border/80 bg-surface-raised/60 hover:border-accent-cyan/50 hover:bg-surface-raised'
+                  }`}
+                >
+                  <div className="relative overflow-hidden rounded-lg">
+                    <img
+                      src={img.url}
+                      alt={img.title}
+                      className="h-28 w-full object-cover transition duration-300 group-hover:scale-105"
+                    />
+                    <span className="absolute top-1 left-1 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-xs">
+                      {img.category}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewZoomUrl(img.url);
+                      }}
+                      className="absolute bottom-1 right-1 rounded bg-black/70 p-1 text-[10px] text-white opacity-0 transition group-hover:opacity-100 hover:bg-accent-cyan hover:text-black"
+                      title="Agrandir"
+                    >
+                      🔍
+                    </button>
+                  </div>
+                  <div className="mt-1.5 px-1 pb-1">
+                    <div className="truncate text-[11px] font-semibold text-white">{img.title}</div>
+                    <div className="text-[10px] text-muted-foreground">{img.license}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Onglet Upload */}
+      {/* Onglet Upload avec Drag & Drop et URL */}
       {tab === 'UPLOAD' && (
         <div className="mt-4 space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-muted-foreground">Importer une image depuis votre ordinateur :</label>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (evt) => {
-                    const dataUrl = evt.target?.result as string;
-                    if (dataUrl) {
-                      onSelectMedia({
-                        url: dataUrl,
-                        kind: 'USER_UPLOAD',
-                        altText: file.name.replace(/\.[^/.]+$/, ''),
-                      });
-                    }
-                  };
-                  reader.readAsDataURL(file);
-                }
-              }}
-              className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-xl file:border-0 file:bg-surface-raised file:px-4 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-surface-raised/80 cursor-pointer"
-            />
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) handleFileSelect(file);
+            }}
+            className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition ${
+              isDragging
+                ? 'border-accent-cyan bg-accent-cyan/10 scale-[1.01]'
+                : 'border-border/80 bg-surface-raised/40 hover:border-accent-cyan/50 hover:bg-surface-raised/60'
+            }`}
+          >
+            <span className="text-3xl">📁</span>
+            <p className="mt-2 text-xs font-semibold text-white">
+              Glissez-déposez votre image ici, ou parcourez vos fichiers
+            </p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">
+              Formats supportés : PNG, JPEG, WebP, GIF jusqu’à 10 Mo
+            </p>
+
+            <label className="mt-3 cursor-pointer rounded-xl bg-surface-raised px-4 py-2 text-xs font-bold text-white border border-border hover:border-accent-cyan transition">
+              <span>Choisir un fichier</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelect(file);
+                }}
+                className="hidden"
+              />
+            </label>
+
+            {uploadFileName && (
+              <p className="mt-2 text-xs text-accent-cyan font-medium">✓ Fichier importé : {uploadFileName}</p>
+            )}
           </div>
 
           <div className="relative flex py-1 items-center">
             <div className="flex-grow border-t border-border/50"></div>
-            <span className="flex-shrink mx-3 text-[10px] text-muted-foreground uppercase font-bold tracking-wider">ou par lien URL direct</span>
+            <span className="flex-shrink mx-3 text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+              ou par lien URL direct
+            </span>
             <div className="flex-grow border-t border-border/50"></div>
           </div>
 
@@ -440,27 +652,35 @@ export default function IllustrationStudio({
             <div className="flex gap-2">
               <input
                 value={customUrl}
-                onChange={(e) => setCustomUrl(e.target.value)}
+                onChange={(e) => {
+                  setCustomUrl(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCustomUrlApply();
+                  }
+                }}
                 placeholder="https://domaine.com/visuel-analyse.jpg"
-                className="flex-1 rounded-xl border border-border bg-surface-raised/90 px-3 py-2 text-xs text-white outline-none focus:border-accent-cyan"
+                className="flex-1 rounded-xl border border-border bg-surface-raised/90 px-3 py-2 text-xs text-white outline-none focus:border-accent-cyan font-mono"
               />
               <button
                 type="button"
-                onClick={() => {
-                  if (customUrl.trim()) {
-                    onSelectMedia({
-                      url: customUrl.trim(),
-                      kind: 'USER_UPLOAD',
-                      altText: 'Image importée par l’utilisateur',
-                    });
-                  }
-                }}
+                onClick={handleCustomUrlApply}
                 className="rounded-xl bg-surface-raised px-4 py-2 text-xs font-semibold text-white border border-border hover:border-accent-cyan transition"
               >
                 Appliquer
               </button>
             </div>
           </div>
+
+          {errorMessage && (
+            <div className="rounded-xl border border-danger/30 bg-danger/10 p-2.5 text-xs text-danger flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{errorMessage}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -468,17 +688,34 @@ export default function IllustrationStudio({
       {selectedMedia && (
         <div className="mt-4 flex items-center justify-between rounded-xl border border-accent-cyan/40 bg-accent-cyan/5 p-3.5 shadow-sm">
           <div className="flex items-center gap-3.5">
-            <img src={selectedMedia.url} alt="Sélection" className="h-14 w-20 rounded-lg object-cover border border-border/80 shadow" />
+            <div
+              onClick={() => setPreviewZoomUrl(selectedMedia.url)}
+              className="group relative cursor-pointer overflow-hidden rounded-lg border border-border/80 shadow"
+              title="Cliquer pour agrandir"
+            >
+              <img
+                src={selectedMedia.url}
+                alt="Sélection"
+                className="h-14 w-20 object-cover transition duration-300 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
+                <span className="text-xs text-white">🔍</span>
+              </div>
+            </div>
             <div className="text-xs">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-white">Illustration active attachée</span>
-                {selectedMedia.aiGenerated ? (
-                  <span className="rounded-full bg-accent-magenta/20 border border-accent-magenta/40 px-2 py-0.2 text-[10px] font-bold text-accent-magenta">
-                    ✦ IA STARS
+                {selectedMedia.aiGenerated || selectedMedia.kind === 'AI_GENERATED' ? (
+                  <span className="rounded-full bg-accent-magenta/20 border border-accent-magenta/40 px-2 py-0.5 text-[10px] font-bold text-accent-magenta">
+                    ✦ IA STARS (C2PA)
+                  </span>
+                ) : selectedMedia.kind === 'USER_UPLOAD' ? (
+                  <span className="rounded-full bg-accent-emerald/20 border border-accent-emerald/40 px-2 py-0.5 text-[10px] font-bold text-accent-emerald">
+                    📁 Import Personnel
                   </span>
                 ) : (
-                  <span className="rounded-full bg-accent-blue/20 border border-accent-blue/40 px-2 py-0.2 text-[10px] font-bold text-accent-blue">
-                    Stock Certifié
+                  <span className="rounded-full bg-accent-blue/20 border border-accent-blue/40 px-2 py-0.5 text-[10px] font-bold text-accent-blue">
+                    📷 Stock Certifié
                   </span>
                 )}
               </div>
@@ -490,11 +727,55 @@ export default function IllustrationStudio({
           <button
             type="button"
             onClick={() => onSelectMedia(null)}
-            className="text-xs text-muted-foreground hover:text-danger p-1"
-            title="Supprimer"
+            className="rounded-lg p-1.5 text-xs text-muted-foreground transition hover:bg-danger/10 hover:text-danger"
+            title="Retirer ce visuel"
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* Lightbox / Zoom HD Modal */}
+      {previewZoomUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={() => setPreviewZoomUrl(null)}
+        >
+          <div
+            className="relative max-w-3xl w-full rounded-2xl border border-border bg-surface-raised p-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">🔍</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-white">Aperçu Haute Définition</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewZoomUrl(null)}
+                className="rounded-lg p-1 text-sm text-muted-foreground hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mt-3 flex items-center justify-center overflow-hidden rounded-xl bg-black/60 max-h-[70vh]">
+              <img
+                src={previewZoomUrl}
+                alt="Aperçu HD"
+                className="max-h-[70vh] w-auto max-w-full object-contain rounded-lg shadow-lg"
+              />
+            </div>
+            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Résolution optimale pour les réseaux sociaux sélectionnés</span>
+              <button
+                type="button"
+                onClick={() => setPreviewZoomUrl(null)}
+                className="rounded-xl bg-surface px-3 py-1.5 font-semibold text-white border border-border hover:border-accent-cyan"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

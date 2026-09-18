@@ -389,6 +389,24 @@ export class EditorialService {
   }
 
   /**
+   * Détache toutes les illustrations liées à un brouillon (quand l'utilisateur retire le visuel)
+   */
+  static async detachIllustration(params: {
+    organizationId: string;
+    draftId: string;
+  }) {
+    return db.mediaAsset.updateMany({
+      where: {
+        organizationId: params.organizationId,
+        draftId: params.draftId,
+      },
+      data: {
+        draftId: null,
+      },
+    });
+  }
+
+  /**
    * Génère nativement une illustration par IA (OpenAI DALL·E 3 ou moteur natif C2PA)
    * et l'enregistre directement dans le Media Vault de l'organisation.
    */

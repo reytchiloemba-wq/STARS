@@ -7,6 +7,7 @@ import {
   saveDraftAction,
   publishOrScheduleAction,
   attachIllustrationAction,
+  detachIllustrationAction,
   generateIllustrationAction,
   type PublishTargetResult,
 } from './actions';
@@ -260,6 +261,8 @@ export default function StudioClient({
             aiPrompt: selectedMedia.aiPrompt,
             aiGenerated: selectedMedia.aiGenerated,
           });
+        } else {
+          await detachIllustrationAction(org, res.draftId);
         }
         setStatusMessage({ type: 'success', text: 'Brouillon sauvegardé et synchronisé.' });
       } else {
@@ -291,6 +294,8 @@ export default function StudioClient({
               aiPrompt: selectedMedia.aiPrompt,
               aiGenerated: selectedMedia.aiGenerated,
             });
+          } else {
+            await detachIllustrationAction(org, res.draftId);
           }
           completePublish(res.draftId);
         } else {
@@ -308,6 +313,8 @@ export default function StudioClient({
           aiPrompt: selectedMedia.aiPrompt,
           aiGenerated: selectedMedia.aiGenerated,
         }).catch(() => {});
+      } else if (!selectedMedia && savedDraftId) {
+        detachIllustrationAction(org, savedDraftId).catch(() => {});
       }
       completePublish(savedDraftId);
     }

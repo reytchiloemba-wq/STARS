@@ -83,4 +83,56 @@ describe('Illustration Studio & Life Cycle Workflows', () => {
     const techVisual = await adapter.generateIllustration('Intelligence artificielle et sécurité informatique', '1:1');
     expect(techVisual.url).toContain('1526374965328'); // Tech matrix
   });
+
+  it('correctly detaches illustrations when a user removes the visual from a draft', async () => {
+    // 1. Create a draft
+    const draft = await db.draft.create({
+      data: {
+        organizationId: testOrgId,
+        ownerId: testUserId,
+        network: 'LINKEDIN',
+        objective: 'EDUCATE',
+        tone: 'EXPERT',
+        currentContent: 'Contenu avec visuel à détacher',
+        status: 'DRAFT',
+      },
+    });
+
+    // 2. Attach an illustration
+    const attached = await EditorialService.attachIllustration({
+      organizationId: testOrgId,
+      userId: testUserId,
+      draftId: draft.id,
+      url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1200',
+      kind: MediaKind.STOCK_IMAGE,
+      altText: 'Tech image',
+    });
+
+    expect(attached.draftId).toBe(draft.id);
+
+    // 3. Verify in DB
+    const mediaBefore = await db.mediaAsset.findFirst({
+      where: { draftId: draft.id },
+    });
+    expect(mediaBefore?.id).toBe(attached.id);
+
+    // 4. Detach illustration
+    await EditorialService.detachIllustration({
+      organizationId: testOrgId,
+      draftId: draft.id,
+    });
+
+    // 5. Verify it is unlinked from the draft
+    const mediaAfter = await db.mediaAsset.findFirst({
+      where: { draftId: draft.id },
+    });
+    expect(mediaAfter).toBeNull();
+
+    // Asset still exists in org library
+    const assetInOrg = await db.mediaAsset.findUnique({
+      where: { id: attached.id },
+    });
+    expect(assetInOrg?.draftId).toBeNull();
+    expect(assetInOrg?.organizationId).toBe(testOrgId);
+  });
 });
