@@ -92,12 +92,20 @@ export class FacebookConnector implements SocialConnector {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
 
-      const json = (await res.json().catch(() => null)) as { id?: string; error?: { message?: string } } | null;
+      const json = (await res.json().catch(() => null)) as {
+        id?: string;
+        error?: { message?: string; code?: number };
+      } | null;
 
       if (!res.ok || !json?.id) {
+        let errorMsg = json?.error?.message ?? `HTTP ${res.status}`;
+        if (json?.error?.code === 190 || errorMsg.includes('permission(s) must be granted')) {
+          errorMsg =
+            'Le jeton de la Page Facebook a expiré ou nécessite la permission pages_read_engagement. Veuillez reconnecter votre Page Facebook dans Paramètres > Mes Réseaux Sociaux.';
+        }
         return {
           success: false,
-          errorMessage: `Facebook a refusé la publication : ${json?.error?.message ?? `HTTP ${res.status}`}`,
+          errorMessage: `Facebook a refusé la publication : ${errorMsg}`,
         };
       }
 
