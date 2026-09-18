@@ -261,7 +261,7 @@ export default async function SocialSettingsPage({
                     <>
                       {/* Bouton OAuth Réel */}
                       <a
-                        href={`/api/oauth/${n.key}/start?org=${org}`}
+                        href={`/api/oauth/${n.key}/start?org=${org}${n.key === 'linkedin' ? '&company=true' : ''}`}
                         className="block w-full rounded-xl bg-start-gradient py-2 text-center text-xs font-bold text-white shadow-sm transition hover:scale-[1.01] hover:opacity-95"
                       >
                         Connecter via {n.label} ↗

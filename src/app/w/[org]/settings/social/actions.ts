@@ -65,3 +65,62 @@ export async function connectSandboxAccountAction(orgSlug: string, network: Soci
   revalidatePath(`/w/${orgSlug}/settings/social`);
   revalidatePath(`/w/${orgSlug}/studio`);
 }
+
+export async function linkLinkedInCompanyPageAction(
+  orgSlug: string,
+  pageIdentifier: string,
+  customDisplayName?: string,
+) {
+  const ctx = await requireTenantPermission(orgSlug, 'social.connect');
+
+  const linkedInUserAccount = await db.socialAccount.findFirst({
+    where: {
+      organizationId: ctx.organization.id,
+      network: 'LINKEDIN',
+      status: 'ACTIVE',
+      NOT: { externalId: { startsWith: 'sandbox_' } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const cleanId = pageIdentifier
+    .replace(/^urn:li:organization:/, '')
+    .replace(/^https:\/\/.*linkedin\.com\/company\//, '')
+    .replace(/\/.*$/, '')
+    .trim();
+
+  const orgUrn = `urn:li:organization:${cleanId}`;
+  const displayName = customDisplayName?.trim() || `HORUS Business Automation Engineered (Page LinkedIn)`;
+  const accessTokenEnc = linkedInUserAccount?.accessTokenEnc || encryptSecret('sandbox_access_token_linkedin_2026');
+
+  await db.socialAccount.upsert({
+    where: {
+      organizationId_network_externalId: {
+        organizationId: ctx.organization.id,
+        network: 'LINKEDIN',
+        externalId: orgUrn,
+      },
+    },
+    create: {
+      organizationId: ctx.organization.id,
+      network: 'LINKEDIN',
+      externalId: orgUrn,
+      displayName,
+      scopes: ['openid', 'profile', 'w_member_social', 'w_organization_social', 'r_organization_social'],
+      accessTokenEnc,
+      connectedById: ctx.userId,
+      status: 'ACTIVE',
+      expiresAt: linkedInUserAccount?.expiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    },
+    update: {
+      displayName,
+      status: 'ACTIVE',
+      accessTokenEnc,
+      expiresAt: linkedInUserAccount?.expiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  revalidatePath(`/w/${orgSlug}/settings/social`);
+  revalidatePath(`/w/${orgSlug}/studio`);
+  revalidatePath(`/w/${orgSlug}/drafts`);
+}

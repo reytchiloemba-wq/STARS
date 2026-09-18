@@ -11,6 +11,16 @@ type EnrichedDraft = Draft & {
   comments: (Comment & { author: { id: string; name: string | null; email: string } })[];
   approvals: Approval[];
   mediaAssets: MediaAsset[];
+  publications?: Array<{
+    id: string;
+    status: string;
+    targets: Array<{
+      id: string;
+      status: string;
+      errorMessage: string | null;
+      socialAccount: { id: string; displayName: string; network: string };
+    }>;
+  }>;
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -24,6 +34,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   APPROVED: { label: 'Approuvé', color: 'border-success/30 bg-success/10 text-success' },
   SCHEDULED: { label: 'Programmé', color: 'border-accent-violet/30 bg-accent-violet/10 text-accent-violet' },
   PUBLISHED: { label: 'Publié', color: 'border-success/40 bg-success/15 text-success font-bold' },
+  FAILED: { label: 'Échec de publication', color: 'border-danger/40 bg-danger/10 text-danger font-bold' },
 };
 
 export default function DraftsClient({
@@ -126,7 +137,25 @@ export default function DraftsClient({
                   <p className="line-clamp-2 text-sm text-foreground">
                     {d.currentContent || 'Brouillon sans contenu'}
                   </p>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+
+                  {d.status === 'FAILED' && (
+                    <div className="mt-2 rounded-xl border border-danger/40 bg-danger/10 p-2.5 text-xs text-danger flex items-start gap-2">
+                      <span className="text-sm">⚠️</span>
+                      <div className="flex-1">
+                        <div className="font-bold">
+                          {d.publications?.[0]?.targets?.[0]?.socialAccount?.displayName
+                            ? `Échec sur ${d.publications[0].targets[0].socialAccount.displayName}`
+                            : 'Échec de publication sur LinkedIn'}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-danger/90 leading-relaxed">
+                          {d.publications?.[0]?.targets?.[0]?.errorMessage ||
+                            "LinkedIn a rejeté la publication. Cliquez sur 'Republier dans le Studio' pour sélectionner votre compte ou ajuster le texte."}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground pt-0.5">
                     <span>Mis à jour le {new Date(d.updatedAt).toLocaleDateString('fr-FR')}</span>
                     <span>·</span>
                     <span>{d.versions.length} version(s)</span>
@@ -145,9 +174,11 @@ export default function DraftsClient({
                   </button>
                   <Link
                     href={`/w/${org}/studio?draftId=${d.id}`}
-                    className="rounded-xl bg-start-gradient px-4 py-2 text-xs font-semibold text-white shadow hover:opacity-90"
+                    className={`rounded-xl px-4 py-2 text-xs font-semibold text-white shadow transition hover:opacity-90 ${
+                      d.status === 'FAILED' ? 'bg-gradient-to-r from-danger to-accent-magenta animate-pulse' : 'bg-start-gradient'
+                    }`}
                   >
-                    Éditer dans le Studio →
+                    {d.status === 'FAILED' ? 'Republier dans le Studio →' : 'Éditer dans le Studio →'}
                   </Link>
                 </div>
               </div>

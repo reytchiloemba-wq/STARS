@@ -20,7 +20,7 @@ const NETWORK_CONFIG: Record<SocialNetwork, ProviderOAuthConfig> = {
   LINKEDIN: {
     authorizeUrl: 'https://www.linkedin.com/oauth/v2/authorization',
     tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
-    scopes: ['openid', 'profile', 'w_member_social'],
+    scopes: ['openid', 'profile', 'w_member_social', 'w_organization_social', 'r_organization_social'],
   },
   FACEBOOK: {
     authorizeUrl: 'https://www.facebook.com/v21.0/dialog/oauth',
@@ -372,9 +372,12 @@ export async function completeOAuthFlow(
 
       // Découverte automatique des Pages Entreprise LinkedIn administrées
       const orgAclRes = await fetch(
-        'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED',
+        'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&state=APPROVED',
         {
-          headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+          headers: {
+            Authorization: `Bearer ${tokenJson.access_token}`,
+            'X-Restli-Protocol-Version': '2.0.0',
+          },
           signal: AbortSignal.timeout(8000),
         },
       ).catch(() => null);
@@ -390,7 +393,10 @@ export async function completeOAuthFlow(
             let pageName = `Page LinkedIn (${orgId})`;
             try {
               const orgDetailsRes = await fetch(`https://api.linkedin.com/v2/organizations/${orgId}`, {
-                headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+                headers: {
+                  Authorization: `Bearer ${tokenJson.access_token}`,
+                  'X-Restli-Protocol-Version': '2.0.0',
+                },
                 signal: AbortSignal.timeout(5000),
               });
               if (orgDetailsRes.ok) {

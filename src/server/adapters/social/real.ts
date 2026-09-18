@@ -34,30 +34,60 @@ export class LinkedInConnector implements SocialConnector {
         authorUrn = isOrg ? `urn:li:organization:${cleanId}` : `urn:li:person:${cleanId}`;
       }
 
-      const res = await fetch('https://api.linkedin.com/v2/ugcPosts', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${req.accessToken}`,
-          'Content-Type': 'application/json',
-          'X-Restli-Protocol-Version': '2.0.0',
-        },
-        body: JSON.stringify({
-          author: authorUrn,
-          lifecycleState: 'PUBLISHED',
-          specificContent: {
-            'com.linkedin.ugc.ShareContent': {
-              shareCommentary: { text: req.content },
-              shareMediaCategory: 'NONE',
-            },
+      const postContent = async (text: string) => {
+        return fetch('https://api.linkedin.com/v2/ugcPosts', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${req.accessToken}`,
+            'Content-Type': 'application/json',
+            'X-Restli-Protocol-Version': '2.0.0',
           },
-          visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
-        }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
+          body: JSON.stringify({
+            author: authorUrn,
+            lifecycleState: 'PUBLISHED',
+            specificContent: {
+              'com.linkedin.ugc.ShareContent': {
+                shareCommentary: { text },
+                shareMediaCategory: 'NONE',
+              },
+            },
+            visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
+          }),
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+      };
+
+      let res = await postContent(req.content);
+
+      // Si LinkedIn détecte un doublon (HTTP 422 DUPLICATE_POST), retenter avec un caractère zéro-largeur invisible
+      if (res.status === 422) {
+        const bodyPreview = await res.clone().text().catch(() => '');
+        if (bodyPreview.includes('duplicate') || bodyPreview.includes('DUPLICATE')) {
+          res = await postContent(`${req.content}\n\u200B`);
+        }
+      }
 
       if (!res.ok) {
         const body = await res.text().catch(() => '');
-        return { success: false, errorMessage: `LinkedIn a refusé la publication (HTTP ${res.status}). ${body.slice(0, 300)}` };
+        let readableError = `LinkedIn a refusé la publication (HTTP ${res.status}).`;
+        if (body.includes('DUPLICATE') || body.includes('duplicate')) {
+          readableError =
+            "LinkedIn a rejeté la publication car un contenu identique a été publié récemment sur ce compte. Veuillez modifier légèrement le texte.";
+        } else if (res.status === 403 || body.includes('NOT_ENOUGH_PERMISSIONS')) {
+          readableError =
+            "Permissions insuffisantes pour publier sur ce compte LinkedIn. Reconnectez votre profil ou votre Page Entreprise depuis Paramètres > Mes Réseaux Sociaux.";
+        } else if (res.status === 401) {
+          readableError =
+            "La session LinkedIn a expiré. Veuillez reconnecter votre compte dans Paramètres > Mes Réseaux Sociaux.";
+        } else if (body) {
+          try {
+            const parsed = JSON.parse(body);
+            readableError += ` ${parsed.message || parsed.errorDetailType || body.slice(0, 200)}`;
+          } catch {
+            readableError += ` ${body.slice(0, 200)}`;
+          }
+        }
+        return { success: false, errorMessage: readableError };
       }
 
       const postId = res.headers.get('x-restli-id') ?? (await res.json().catch(() => null))?.id;

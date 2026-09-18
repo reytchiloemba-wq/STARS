@@ -18,6 +18,19 @@ export default async function DraftsPage({ params }: { params: Promise<{ org: st
       },
       approvals: { orderBy: { decidedAt: 'desc' } },
       mediaAssets: true,
+      publications: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        include: {
+          targets: {
+            include: {
+              socialAccount: {
+                select: { id: true, displayName: true, network: true },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
