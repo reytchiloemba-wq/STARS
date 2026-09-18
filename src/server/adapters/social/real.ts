@@ -18,12 +18,22 @@ export class LinkedInConnector implements SocialConnector {
   async publish(req: SocialPublishRequest): Promise<SocialPublishResult> {
     if (!req.accessToken) return { success: false, errorMessage: 'Aucun jeton LinkedIn disponible pour ce compte.' };
 
-    // NOTE: `socialAccountExternalId` must be the real LinkedIn person/organization
-    // URN suffix. src/server/services/oauth.service.ts currently stores a
-    // placeholder (token fingerprint) here pending a profile-resolution call —
-    // a known, documented gap (see README). This call will honestly fail
-    // (401/403 from LinkedIn) until that's wired up; it will never fabricate success.
+    // Mode Bac à sable (Sandbox) : simule une publication réussie sans appeler l'API réelle
+    if (req.accessToken.startsWith('sandbox_') || req.socialAccountExternalId.startsWith('sandbox_')) {
+      const sandboxPostId = `urn:li:share:sandbox_${Date.now()}`;
+      return { success: true, externalPostId: sandboxPostId };
+    }
+
     try {
+      // Support URN format : soit profil personnel (person), soit page entreprise (organization)
+      let authorUrn = req.socialAccountExternalId;
+      if (!authorUrn.startsWith('urn:li:')) {
+        // Les identifiants d'organisations/entreprises LinkedIn sont typiquement numériques ou préfixés
+        const isOrg = /^\d+$/.test(authorUrn) || authorUrn.startsWith('org_');
+        const cleanId = authorUrn.replace(/^org_/, '');
+        authorUrn = isOrg ? `urn:li:organization:${cleanId}` : `urn:li:person:${cleanId}`;
+      }
+
       const res = await fetch('https://api.linkedin.com/v2/ugcPosts', {
         method: 'POST',
         headers: {
@@ -32,7 +42,7 @@ export class LinkedInConnector implements SocialConnector {
           'X-Restli-Protocol-Version': '2.0.0',
         },
         body: JSON.stringify({
-          author: `urn:li:person:${req.socialAccountExternalId}`,
+          author: authorUrn,
           lifecycleState: 'PUBLISHED',
           specificContent: {
             'com.linkedin.ugc.ShareContent': {
@@ -68,6 +78,9 @@ export class FacebookConnector implements SocialConnector {
 
   async publish(req: SocialPublishRequest): Promise<SocialPublishResult> {
     if (!req.accessToken) return { success: false, errorMessage: 'Aucun jeton Facebook disponible pour ce compte.' };
+    if (req.accessToken.startsWith('sandbox_') || req.socialAccountExternalId.startsWith('sandbox_')) {
+      return { success: true, externalPostId: `fb_page_sandbox_${Date.now()}` };
+    }
     // `socialAccountExternalId` must be the Facebook Page id (a Page access
     // token, not a user token, is required to post to a Page's feed).
     try {
@@ -103,6 +116,9 @@ export class InstagramConnector implements SocialConnector {
 
   async publish(req: SocialPublishRequest): Promise<SocialPublishResult> {
     if (!req.accessToken) return { success: false, errorMessage: 'Aucun jeton Instagram disponible pour ce compte.' };
+    if (req.accessToken.startsWith('sandbox_') || req.socialAccountExternalId.startsWith('sandbox_')) {
+      return { success: true, externalPostId: `ig_sandbox_${Date.now()}` };
+    }
     // Instagram's Content Publishing API cannot post text alone — it requires
     // an image/video to create a media container first. Rather than fake a
     // text-only "post", this honestly refuses when no media is attached.
@@ -170,6 +186,9 @@ export class XConnector implements SocialConnector {
 
   async publish(req: SocialPublishRequest): Promise<SocialPublishResult> {
     if (!req.accessToken) return { success: false, errorMessage: 'Aucun jeton X disponible pour ce compte.' };
+    if (req.accessToken.startsWith('sandbox_') || req.socialAccountExternalId.startsWith('sandbox_')) {
+      return { success: true, externalPostId: `x_tweet_sandbox_${Date.now()}` };
+    }
 
     try {
       const res = await fetch('https://api.x.com/2/tweets', {

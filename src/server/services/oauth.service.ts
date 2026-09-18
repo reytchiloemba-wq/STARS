@@ -45,9 +45,10 @@ function providerKeyFor(network: SocialNetwork): string {
 }
 
 export class OAuthNotConfiguredError extends Error {
-  constructor(network: SocialNetwork) {
+  constructor(network: SocialNetwork, customMessage?: string) {
     super(
-      `${network} n'est pas configuré par l'administrateur de la plateforme. Contactez votre administrateur STARS.`,
+      customMessage ??
+        `${network} n'est pas configuré par l'administrateur de la plateforme. Contactez votre administrateur STARS.`,
     );
     this.name = 'OAuthNotConfiguredError';
   }
@@ -115,6 +116,23 @@ export async function startOAuthFlow(
   const creds = decryptCredentials<{ clientId?: string; appId?: string }>(integration.credentialsEnc);
   const clientId = creds.clientId ?? creds.appId;
   if (!clientId) throw new OAuthNotConfiguredError(network);
+
+  // Détection des erreurs de saisie inter-plateformes (ex: clé Twitter/X collée dans LinkedIn)
+  if (network === 'LINKEDIN' && (clientId.includes(':ci') || clientId.includes(':1:ci'))) {
+    throw new OAuthNotConfiguredError(
+      network,
+      "L'identifiant LinkedIn configuré dans le Cockpit Super-Admin est invalide : une clé API Twitter/X (« " +
+        clientId.slice(0, 16) +
+        "... ») y a été renseignée par erreur. Veuillez renseigner le vrai Client ID LinkedIn (obtenu sur https://www.linkedin.com/developers/apps) dans /admin/infrastructure, ou activer un compte Sandbox ci-dessous.",
+    );
+  }
+
+  if (integration.status === 'ERROR') {
+    throw new OAuthNotConfiguredError(
+      network,
+      `${network} est actuellement marqué en erreur dans le Cockpit Super-Admin (${integration.lastTestMessage ?? 'identifiants non vérifiés'}). Veuillez corriger les identifiants dans /admin/infrastructure ou utiliser le mode Sandbox ci-dessous.`,
+    );
+  }
 
   const config = NETWORK_CONFIG[network];
   const state = base64url(randomBytes(24));
@@ -311,7 +329,70 @@ export async function completeOAuthFlow(
       if (userRes.ok) {
         const userData = (await userRes.json()) as { sub?: string; name?: string };
         if (userData.sub) externalId = userData.sub;
-        if (userData.name) displayName = `${userData.name} (LinkedIn)`;
+        if (userData.name) displayName = `${userData.name} (Profil LinkedIn)`;
+      }
+
+      // Découverte automatique des Pages Entreprise LinkedIn administrées
+      const orgAclRes = await fetch(
+        'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED',
+        {
+          headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+          signal: AbortSignal.timeout(8000),
+        },
+      ).catch(() => null);
+
+      if (orgAclRes && orgAclRes.ok) {
+        const acls = (await orgAclRes.json()) as {
+          elements?: Array<{ organizationalTarget?: string }>;
+        };
+        for (const elem of acls.elements || []) {
+          const orgUrn = elem.organizationalTarget;
+          if (orgUrn) {
+            const orgId = orgUrn.split(':').pop() || orgUrn;
+            let pageName = `Page LinkedIn (${orgId})`;
+            try {
+              const orgDetailsRes = await fetch(`https://api.linkedin.com/v2/organizations/${orgId}`, {
+                headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+                signal: AbortSignal.timeout(5000),
+              });
+              if (orgDetailsRes.ok) {
+                const orgData = (await orgDetailsRes.json()) as { localizedName?: string };
+                if (orgData.localizedName) pageName = `${orgData.localizedName} (Page LinkedIn)`;
+              }
+            } catch {}
+
+            await db.socialAccount.upsert({
+              where: {
+                organizationId_network_externalId: {
+                  organizationId: stateRow.organizationId,
+                  network: 'LINKEDIN',
+                  externalId: orgUrn,
+                },
+              },
+              create: {
+                organizationId: stateRow.organizationId,
+                network: 'LINKEDIN',
+                externalId: orgUrn,
+                displayName: pageName,
+                scopes: config.scopes,
+                accessTokenEnc: encryptSecret(tokenToEncrypt),
+                refreshTokenEnc: tokenJson.refresh_token ? encryptSecret(tokenJson.refresh_token) : null,
+                expiresAt: tokenJson.expires_in ? new Date(Date.now() + tokenJson.expires_in * 1000) : null,
+                connectedById: stateRow.userId,
+                status: 'ACTIVE',
+              },
+              update: {
+                displayName: pageName,
+                scopes: config.scopes,
+                accessTokenEnc: encryptSecret(tokenToEncrypt),
+                refreshTokenEnc: tokenJson.refresh_token ? encryptSecret(tokenJson.refresh_token) : null,
+                expiresAt: tokenJson.expires_in ? new Date(Date.now() + tokenJson.expires_in * 1000) : null,
+                connectedById: stateRow.userId,
+                status: 'ACTIVE',
+              },
+            });
+          }
+        }
       }
     } catch {
       // keep fallback

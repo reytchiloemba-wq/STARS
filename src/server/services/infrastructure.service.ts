@@ -196,6 +196,45 @@ async function runTest(
         }
       }
 
+      if (providerKey === 'linkedin') {
+        const clientId = creds.clientId?.trim();
+        const clientSecret = creds.clientSecret?.trim();
+        if (clientId && clientSecret) {
+          if (clientId.includes(':ci') || clientId.includes(':1:ci')) {
+            return {
+              success: false,
+              message: "L'identifiant saisi est une clé Twitter/X et non LinkedIn. Un Client ID LinkedIn est une chaîne alphanumérique (disponible dans votre application sur https://www.linkedin.com/developers/apps).",
+            };
+          }
+          try {
+            const res = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                grant_type: 'client_credentials',
+                client_id: clientId,
+                client_secret: clientSecret,
+              }),
+              signal: AbortSignal.timeout(8000),
+            });
+            const data = (await res.json().catch(() => null)) as {
+              error?: string;
+              error_description?: string;
+              access_token?: string;
+            } | null;
+
+            if (data?.error === 'invalid_client_id') {
+              return {
+                success: false,
+                message: `LinkedIn a rejeté vos identifiants : ${data.error_description || 'Client ID inexistant'}. Vérifiez vos identifiants sur le portail développeur LinkedIn.`,
+              };
+            }
+          } catch (err) {
+            // Ignorer timeout réseau
+          }
+        }
+      }
+
       return {
         success: true,
         message: "Format des identifiants valide. Prêt pour l'authentification des comptes.",
