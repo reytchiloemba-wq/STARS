@@ -331,8 +331,26 @@ export async function completeOAuthFlow(
 
   if (network === 'FACEBOOK') {
     try {
+      // Échange du jeton utilisateur court contre un jeton longue durée (60 jours)
+      // Permet à Meta de générer un jeton de Page permanent (sans expiration)
+      let effectiveUserToken = tokenJson.access_token;
+      try {
+        const longLivedRes = await fetch(
+          `https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${tokenJson.access_token}`,
+          { signal: AbortSignal.timeout(8000) },
+        );
+        if (longLivedRes.ok) {
+          const longLivedData = (await longLivedRes.json()) as { access_token?: string };
+          if (longLivedData.access_token) {
+            effectiveUserToken = longLivedData.access_token;
+          }
+        }
+      } catch (err) {
+        console.warn('[OAuth] Could not exchange for long-lived Facebook token:', err);
+      }
+
       const accountsRes = await fetch(
-        `https://graph.facebook.com/v21.0/me/accounts?access_token=${tokenJson.access_token}`,
+        `https://graph.facebook.com/v21.0/me/accounts?access_token=${effectiveUserToken}`,
         { signal: AbortSignal.timeout(8000) },
       );
       if (accountsRes.ok) {
