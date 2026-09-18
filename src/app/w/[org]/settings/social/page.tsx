@@ -1,6 +1,6 @@
 import { resolveTenant } from '@/lib/tenant';
 import { db } from '@/lib/db';
-import { disconnectSocialAccountAction, connectSandboxAccountAction } from './actions';
+import { disconnectSocialAccountAction, connectSandboxAccountAction, saveFacebookPageTokenAction } from './actions';
 import Link from 'next/link';
 
 const NETWORKS: {
@@ -281,6 +281,50 @@ export default async function SocialSettingsPage({
                       >
                         + Reconnecter un compte {n.label} ↗
                       </a>
+                      {n.key === 'facebook' && (
+                        <details className="mt-2 text-[11px] group">
+                          <summary className="cursor-pointer text-accent-cyan hover:underline list-none flex items-center justify-center gap-1">
+                            <span>🔑 Saisir un Jeton Page direct</span>
+                          </summary>
+                          <form
+                            action={async (formData: FormData) => {
+                              'use server';
+                              const token = formData.get('token') as string;
+                              const pageId = (formData.get('pageId') as string) || '1319414607922500';
+                              if (token) {
+                                await saveFacebookPageTokenAction(org, pageId, token);
+                              }
+                            }}
+                            className="mt-2 space-y-2 p-2.5 rounded-xl border border-white/10 bg-surface-raised/90 text-left"
+                          >
+                            <div>
+                              <label className="text-[10px] text-muted-foreground block mb-0.5">ID de la Page Facebook</label>
+                              <input
+                                name="pageId"
+                                defaultValue="1319414607922500"
+                                className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-muted-foreground block mb-0.5">Jeton d'accès (Page Access Token)</label>
+                              <input
+                                name="token"
+                                type="password"
+                                placeholder="EAA..."
+                                required
+                                className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-white"
+                              />
+                            </div>
+                            <button
+                              type="submit"
+                              className="w-full rounded-lg bg-start-gradient py-1 text-[11px] font-bold text-white shadow"
+                            >
+                              Enregistrer le jeton direct
+                            </button>
+                          </form>
+                        </details>
+                      )}
+
                     </>
                   ) : (
                     <>
@@ -301,6 +345,50 @@ export default async function SocialSettingsPage({
                           + Activer compte Sandbox
                         </button>
                       </form>
+
+                      {n.key === 'facebook' && (
+                        <details className="mt-2 text-[11px] group">
+                          <summary className="cursor-pointer text-accent-cyan hover:underline list-none flex items-center justify-center gap-1">
+                            <span>🔑 Saisir un Jeton Page direct</span>
+                          </summary>
+                          <form
+                            action={async (formData: FormData) => {
+                              'use server';
+                              const token = formData.get('token') as string;
+                              const pageId = (formData.get('pageId') as string) || '1319414607922500';
+                              if (token) {
+                                await saveFacebookPageTokenAction(org, pageId, token);
+                              }
+                            }}
+                            className="mt-2 space-y-2 p-2.5 rounded-xl border border-white/10 bg-surface-raised/90 text-left"
+                          >
+                            <div>
+                              <label className="text-[10px] text-muted-foreground block mb-0.5">ID de la Page Facebook</label>
+                              <input
+                                name="pageId"
+                                defaultValue="1319414607922500"
+                                className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-muted-foreground block mb-0.5">Jeton d'accès (Page Access Token)</label>
+                              <input
+                                name="token"
+                                type="password"
+                                placeholder="EAA..."
+                                required
+                                className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-white"
+                              />
+                            </div>
+                            <button
+                              type="submit"
+                              className="w-full rounded-lg bg-start-gradient py-1 text-[11px] font-bold text-white shadow"
+                            >
+                              Enregistrer le jeton direct
+                            </button>
+                          </form>
+                        </details>
+                      )}
                     </>
                   )}
                 </div>

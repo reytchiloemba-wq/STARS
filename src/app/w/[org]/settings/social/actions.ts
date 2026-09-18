@@ -124,3 +124,70 @@ export async function linkLinkedInCompanyPageAction(
   revalidatePath(`/w/${orgSlug}/studio`);
   revalidatePath(`/w/${orgSlug}/drafts`);
 }
+
+export async function saveFacebookPageTokenAction(
+  orgSlug: string,
+  pageId: string,
+  accessToken: string,
+  customDisplayName?: string,
+) {
+  const ctx = await requireTenantPermission(orgSlug, 'social.connect');
+
+  const cleanPageId = pageId.trim();
+  const cleanToken = accessToken.trim();
+  if (!cleanPageId || !cleanToken) {
+    throw new Error("L'identifiant de la Page et le Jeton d'accès sont obligatoires.");
+  }
+
+  // Vérifier le jeton auprès de l'API Graph Meta
+  let pageName = customDisplayName?.trim();
+  try {
+    const testRes = await fetch(
+      `https://graph.facebook.com/v21.0/${cleanPageId}?fields=id,name&access_token=${cleanToken}`,
+      { signal: AbortSignal.timeout(6000) },
+    );
+    const testJson = (await testRes.json().catch(() => null)) as { id?: string; name?: string } | null;
+    if (testJson?.name && !pageName) {
+      pageName = `${testJson.name} (Page Facebook)`;
+    }
+  } catch {
+    // Si réseau indisponible, conserver le nom par défaut
+  }
+
+  const displayName = pageName || `HORUS Business Automation Engineered (Page Facebook)`;
+  const accessTokenEnc = encryptSecret(cleanToken);
+
+  await db.socialAccount.upsert({
+    where: {
+      organizationId_network_externalId: {
+        organizationId: ctx.organization.id,
+        network: 'FACEBOOK',
+        externalId: cleanPageId,
+      },
+    },
+    create: {
+      organizationId: ctx.organization.id,
+      network: 'FACEBOOK',
+      externalId: cleanPageId,
+      displayName,
+      scopes: ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement'],
+      accessTokenEnc,
+      connectedById: ctx.userId,
+      status: 'ACTIVE',
+      expiresAt: null, // Jeton permanent
+    },
+    update: {
+      displayName,
+      status: 'ACTIVE',
+      accessTokenEnc,
+      expiresAt: null,
+    },
+  });
+
+  revalidatePath(`/w/${orgSlug}/settings/social`);
+  revalidatePath(`/w/${orgSlug}/studio`);
+  revalidatePath(`/w/${orgSlug}/drafts`);
+
+  return { success: true, displayName };
+}
+
