@@ -26,8 +26,8 @@ const PROVIDER_CONFIGS: ProviderSeedConfig[] = [
   {
     key: 'linkedin',
     credentials: {
-      clientId: '86lnkd094stars26',
-      clientSecret: 'WplQ78xYzStarsSec2026',
+      clientId: '78wnh0c58cxm8m',
+      clientSecret: 'stars_linkedin_secret_env',
     },
     isPrimary: true,
     testMessage: 'Format validé — OAuth 2.0 Community Management & Member Social activés.',

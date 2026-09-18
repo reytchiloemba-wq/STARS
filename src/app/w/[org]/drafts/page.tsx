@@ -25,7 +25,7 @@ export default async function DraftsPage({ params }: { params: Promise<{ org: st
           targets: {
             include: {
               socialAccount: {
-                select: { id: true, displayName: true, network: true },
+                select: { id: true, displayName: true, network: true, externalId: true },
               },
             },
           },

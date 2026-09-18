@@ -18,7 +18,7 @@ type EnrichedDraft = Draft & {
       id: string;
       status: string;
       errorMessage: string | null;
-      socialAccount: { id: string; displayName: string; network: string };
+      socialAccount: { id: string; displayName: string; network: string; externalId?: string };
     }>;
   }>;
 };
@@ -44,7 +44,7 @@ export default function DraftsClient({
 }: {
   org: string;
   drafts: EnrichedDraft[];
-  userRole: RoleName;
+  userRole: string;
 }) {
   const [drafts, setDrafts] = useState<EnrichedDraft[]>(initialDrafts);
   const [selectedDraft, setSelectedDraft] = useState<EnrichedDraft | null>(null);
@@ -114,7 +114,13 @@ export default function DraftsClient({
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {drafts.map((d) => {
-            const st = STATUS_LABELS[d.status] || { label: d.status, color: 'border-border' };
+            const isSandboxPub = d.publications?.[0]?.targets?.some((t) =>
+              t.socialAccount?.externalId?.startsWith('sandbox_'),
+            );
+            const st =
+              d.status === 'PUBLISHED' && isSandboxPub
+                ? { label: 'Publié (Simulation Démo)', color: 'border-amber-500/40 bg-amber-500/15 text-amber-300 font-bold' }
+                : STATUS_LABELS[d.status] || { label: d.status, color: 'border-border' };
             return (
               <div
                 key={d.id}
@@ -152,6 +158,24 @@ export default function DraftsClient({
                       {d.currentContent || 'Brouillon sans contenu'}
                     </p>
                   </div>
+
+                  {d.status === 'PUBLISHED' && isSandboxPub && (
+                    <div className="mt-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-200 flex items-start gap-2">
+                      <span className="text-sm">ℹ️</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-amber-300">
+                          Publication transmise au compte simulateur (Sandbox)
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-amber-200/90 leading-relaxed">
+                          Ce post a été diffusé sur{' '}
+                          <span className="font-semibold text-white">
+                            {d.publications?.[0]?.targets?.[0]?.socialAccount?.displayName || 'Compte Démo'}
+                          </span>{' '}
+                          (compte d&apos;essai interne). Pour publier en public sur LinkedIn, diffusez sur votre profil vérifié ou activez les droits Pages Entreprises sur votre console développeur.
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {d.status === 'FAILED' && (
                     <div className="mt-2 rounded-xl border border-danger/40 bg-danger/10 p-2.5 text-xs text-danger flex items-start gap-2">

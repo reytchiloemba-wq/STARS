@@ -864,8 +864,23 @@ export default function StudioClient({
                             className="h-4 w-4 rounded accent-accent-cyan"
                           />
                           <div>
-                            <div className="font-bold text-white">{acc.displayName}</div>
-                            <div className="text-[10px] text-muted-foreground">Réseau : {acc.network} · Statut : {acc.status}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white">{acc.displayName}</span>
+                              {acc.externalId?.startsWith('sandbox_') ? (
+                                <span className="rounded bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
+                                  Mode Démo (Simulation)
+                                </span>
+                              ) : (
+                                <span className="rounded bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400">
+                                  ✓ Compte Réel Connecté
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {acc.externalId?.startsWith('sandbox_')
+                                ? 'Simulation interne pour tests éditoriaux (non diffusé en public)'
+                                : 'Diffusion publique officielle en temps réel'}
+                            </div>
                           </div>
                         </div>
                         <span className="text-[10px] font-semibold text-accent-cyan uppercase">{acc.network}</span>

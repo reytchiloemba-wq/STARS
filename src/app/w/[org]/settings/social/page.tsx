@@ -223,12 +223,37 @@ export default async function SocialSettingsPage({
 
                   {isConnected && (
                     <div className="mt-3 space-y-1.5">
-                      {networkAccounts.map((acc) => (
-                        <div key={acc.id} className="rounded-lg border border-success/30 bg-success/10 p-2 text-[11px] text-white">
-                          <div className="font-semibold truncate">👤 {acc.displayName}</div>
-                          <div className="text-[10px] text-success font-medium">✓ Connecté et prêt à diffuser</div>
-                        </div>
-                      ))}
+                      {networkAccounts.map((acc) => {
+                        const isSandbox = acc.externalId?.startsWith('sandbox_');
+                        return (
+                          <div
+                            key={acc.id}
+                            className={`rounded-lg border p-2 text-[11px] ${
+                              isSandbox
+                                ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+                                : 'border-success/30 bg-success/10 text-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="font-semibold truncate">👤 {acc.displayName}</div>
+                              {isSandbox ? (
+                                <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
+                                  Simulation
+                                </span>
+                              ) : (
+                                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
+                                  ✓ Réel
+                                </span>
+                              )}
+                            </div>
+                            <div className={`text-[10px] mt-0.5 ${isSandbox ? 'text-amber-300/80' : 'text-success font-medium'}`}>
+                              {isSandbox
+                                ? 'Compte de test (non visible sur le vrai LinkedIn)'
+                                : '✓ Connecté et actif pour publication publique'}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
