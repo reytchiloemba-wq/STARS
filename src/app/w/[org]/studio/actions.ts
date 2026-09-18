@@ -144,6 +144,7 @@ export async function attachIllustrationAction(
     aiPrompt?: string;
     aiGenerated?: boolean;
     licenseNote?: string;
+    mediaAssetId?: string;
   },
 ): Promise<{ ok: boolean; assetId?: string; error?: string }> {
   try {
@@ -163,7 +164,7 @@ export async function generateIllustrationAction(
   orgSlug: string,
   params: {
     prompt: string;
-    aspectRatio?: '16:9' | '1:1' | '4:5';
+    aspectRatio?: '16:9' | '1:1' | '4:5' | '9:16';
     altText?: string;
     draftId?: string;
   },

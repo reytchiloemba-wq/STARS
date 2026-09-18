@@ -18,13 +18,15 @@ export class MockAiAdapter implements AiAdapter {
 
   async generateIllustration(
     prompt: string,
-    aspectRatio: '16:9' | '1:1' | '4:5' = '16:9',
+    aspectRatio: '16:9' | '1:1' | '4:5' | '9:16' = '16:9',
   ) {
     const fallbackUrl =
       aspectRatio === '1:1'
         ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop'
         : aspectRatio === '4:5'
         ? 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=800&auto=format&fit=crop'
+        : aspectRatio === '9:16'
+        ? 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=1080&auto=format&fit=crop'
         : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop';
 
     return {

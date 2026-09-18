@@ -318,7 +318,9 @@ export class EditorialService {
   }
 
   /**
-   * Génère ou enregistre une illustration pour un brouillon
+   * Génère ou enregistre une illustration pour un brouillon.
+   * Si l'asset a déjà été généré et facturé via generateAiIllustration (mediaAssetId fourni),
+   * il est simplement associé au brouillon sans refacturation de crédits.
    */
   static async attachIllustration(params: {
     organizationId: string;
@@ -330,8 +332,40 @@ export class EditorialService {
     aiPrompt?: string;
     aiGenerated?: boolean;
     licenseNote?: string;
+    mediaAssetId?: string;
   }) {
-    if (params.aiGenerated) {
+    // 1. Si un ID d'asset existant est fourni, on le relie au brouillon sans refacturer
+    if (params.mediaAssetId) {
+      const existing = await db.mediaAsset.findFirst({
+        where: { id: params.mediaAssetId, organizationId: params.organizationId },
+      });
+      if (existing) {
+        return db.mediaAsset.update({
+          where: { id: existing.id },
+          data: {
+            draftId: params.draftId ?? existing.draftId,
+            altText: params.altText ?? existing.altText,
+          },
+        });
+      }
+    }
+
+    // 2. Déduplication : si l'illustration est déjà attachée à ce brouillon, on la retourne
+    if (params.draftId) {
+      const alreadyAttached = await db.mediaAsset.findFirst({
+        where: {
+          organizationId: params.organizationId,
+          draftId: params.draftId,
+          url: params.url,
+        },
+      });
+      if (alreadyAttached) {
+        return alreadyAttached;
+      }
+    }
+
+    // 3. Déduction de crédits UNIQUEMENT si c'est une nouvelle génération non encore facturée
+    if (params.aiGenerated && !params.mediaAssetId) {
       await deductCredits(
         params.organizationId,
         CREDIT_COSTS.AI_ILLUSTRATION,
@@ -363,7 +397,7 @@ export class EditorialService {
     userId: string;
     draftId?: string;
     prompt: string;
-    aspectRatio?: '16:9' | '1:1' | '4:5';
+    aspectRatio?: '16:9' | '1:1' | '4:5' | '9:16';
     altText?: string;
   }) {
     // 1. Déduction atomique des crédits STARS (SIC)
@@ -430,6 +464,7 @@ export class EditorialService {
   }) {
     const draft = await db.draft.findFirst({
       where: { id: params.draftId, organizationId: params.organizationId },
+      include: { mediaAssets: true },
     });
     if (!draft) throw new Error('Brouillon introuvable');
 
@@ -438,12 +473,6 @@ export class EditorialService {
         id: { in: params.socialAccountIds },
         organizationId: params.organizationId,
         status: 'ACTIVE',
-        // Never trust the client to only send accounts matching the
-        // draft's own network — a LinkedIn-formatted draft (character
-        // limit, tone, hashtag conventions) must never be delivered to a
-        // Facebook/X/Instagram account, whatever the request claims. The
-        // Studio UI already only offers same-network accounts, but this is
-        // the actual enforcement point.
         network: draft.network,
       },
     });
@@ -464,10 +493,6 @@ export class EditorialService {
     });
 
     if (isScheduled && params.scheduledAt) {
-      // Actual delivery happens later, when a Vercel Cron job hits
-      // /api/cron/publish-scheduled and calls executeDueSchedules() below —
-      // see that route and vercel.json. Only the schedule record is created
-      // here; nothing is claimed as published yet.
       for (const acc of accounts) {
         await db.publicationTarget.create({
           data: { publicationId: publication.id, socialAccountId: acc.id, status: 'SCHEDULED' },
@@ -485,7 +510,14 @@ export class EditorialService {
       return publication;
     }
 
-    const succeeded = await EditorialService.attemptDelivery(publication.id, accounts, draft.currentContent ?? '', idempotencyKey);
+    const mediaUrls = (draft as { mediaAssets?: { url: string }[] }).mediaAssets?.map((m) => m.url) ?? [];
+    const succeeded = await EditorialService.attemptDelivery(
+      publication.id,
+      accounts,
+      draft.currentContent ?? '',
+      idempotencyKey,
+      mediaUrls,
+    );
     await db.draft.update({ where: { id: draft.id }, data: { status: succeeded ? 'PUBLISHED' : 'FAILED' } });
 
     return db.publication.findUniqueOrThrow({ where: { id: publication.id } });
@@ -495,16 +527,14 @@ export class EditorialService {
    * Calls the real connector for each account and records the ACTUAL
    * result — one account's failure never contaminates another's, and
    * nothing here is ever inferred without a genuine API call. Shared by
-   * the immediate-publish path above and executeDueSchedules() below, so
-   * a scheduled publication is delivered through the exact same code path
-   * as an immediate one — no separate, divergent "scheduled delivery"
-   * logic to drift out of sync.
+   * the immediate-publish path above and executeDueSchedules() below.
    */
   private static async attemptDelivery(
     publicationId: string,
     accounts: { id: string; network: SocialNetwork; externalId: string; accessTokenEnc: string; organizationId: string }[],
     content: string,
     idempotencyKey: string,
+    mediaUrls: string[] = [],
   ): Promise<boolean> {
     let allSucceeded = true;
     for (const acc of accounts) {
@@ -513,9 +543,6 @@ export class EditorialService {
         accessToken = decryptSecret(acc.accessTokenEnc);
       } catch {
         allSucceeded = false;
-        // upsert, not update: the immediate-publish caller has NOT
-        // pre-created a target row (only the scheduled path does, when it
-        // first queues the SCHEDULED row) — this must work for both.
         await db.publicationTarget.upsert({
           where: { publicationId_socialAccountId: { publicationId, socialAccountId: acc.id } },
           create: {
@@ -539,7 +566,7 @@ export class EditorialService {
         accessToken,
         network: acc.network,
         content,
-        mediaUrls: [],
+        mediaUrls,
         idempotencyKey: `${idempotencyKey}-${acc.id}`,
       });
 
@@ -569,11 +596,7 @@ export class EditorialService {
   /**
    * The actual "worker" for scheduled publications — called by the Vercel
    * Cron-triggered route (/api/cron/publish-scheduled), never by a user
-   * request. Finds every Schedule whose `runAt` has passed and whose
-   * Publication is still SCHEDULED (never already PUBLISHED/FAILED — that
-   * guard makes this safe to call more than once, e.g. if the cron fires
-   * again before the previous run's DB writes are visible), and delivers
-   * each one for real through attemptDelivery().
+   * request.
    */
   static async executeDueSchedules(): Promise<{ processed: number; published: number; failed: number }> {
     const due = await db.schedule.findMany({
@@ -581,7 +604,7 @@ export class EditorialService {
       include: {
         publication: {
           include: {
-            draft: true,
+            draft: { include: { mediaAssets: true } },
             targets: { include: { socialAccount: true } },
           },
         },
@@ -593,20 +616,20 @@ export class EditorialService {
 
     for (const schedule of due) {
       const pub = schedule.publication;
-      // Idempotency guard against a double cron trigger racing this loop:
-      // only proceed if we can flip SCHEDULED -> PUBLISHING ourselves.
       const claimed = await db.publication.updateMany({
         where: { id: pub.id, status: 'SCHEDULED' },
         data: { status: 'PUBLISHING' },
       });
-      if (claimed.count === 0) continue; // another worker run already claimed it
+      if (claimed.count === 0) continue;
 
       const accounts = pub.targets.map((t) => t.socialAccount);
+      const mediaUrls = (pub.draft as { mediaAssets?: { url: string }[] }).mediaAssets?.map((m) => m.url) ?? [];
       const succeeded = await EditorialService.attemptDelivery(
         pub.id,
         accounts,
         pub.draft.currentContent ?? '',
         pub.idempotencyKey,
+        mediaUrls,
       );
       await db.draft.update({ where: { id: pub.draftId }, data: { status: succeeded ? 'PUBLISHED' : 'FAILED' } });
 

@@ -23,7 +23,10 @@ export default async function StudioPage({
     draftId
       ? db.draft.findFirst({
           where: { id: draftId, organizationId: ctx.organization.id },
-          include: { versions: { orderBy: { createdAt: 'desc' }, take: 5 } },
+          include: {
+            versions: { orderBy: { createdAt: 'desc' }, take: 5 },
+            mediaAssets: { orderBy: { createdAt: 'desc' }, take: 1 },
+          },
         })
       : null,
   ]);

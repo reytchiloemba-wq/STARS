@@ -65,7 +65,7 @@ export interface AIProvider {
 }
 
 export interface ImageProvider {
-  generateIllustration(prompt: string, aspectRatio: '16:9' | '1:1' | '4:5'): Promise<ImageGenerationOutput>;
+  generateIllustration(prompt: string, aspectRatio: '16:9' | '1:1' | '4:5' | '9:16'): Promise<ImageGenerationOutput>;
 }
 
 export interface NotificationProvider {

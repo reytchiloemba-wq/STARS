@@ -138,7 +138,10 @@ export default function StudioClient({
   org: string;
   brandVoices: BrandVoice[];
   socialAccounts: SocialAccount[];
-  initialDraft: (Draft & { versions?: { content: string; createdAt: Date }[] }) | null;
+  initialDraft: (Draft & {
+    versions?: { content: string; createdAt: Date }[];
+    mediaAssets?: { id: string; url: string; kind: any; altText: string | null; aiPrompt: string | null; aiGenerated: boolean }[];
+  }) | null;
   initialTitle?: string;
   initialSummary?: string;
 }) {
@@ -155,7 +158,20 @@ export default function StudioClient({
   const [variants, setVariants] = useState<PostVariantItem[]>([]);
   const [activeVariantLabel, setActiveVariantLabel] = useState<string>('concise');
   const [editedContent, setEditedContent] = useState<string>(initialDraft?.currentContent ?? '');
-  const [selectedMedia, setSelectedMedia] = useState<SelectedMedia | null>(null);
+  
+  const firstAttached = initialDraft?.mediaAssets?.[0];
+  const [selectedMedia, setSelectedMedia] = useState<SelectedMedia | null>(
+    firstAttached
+      ? {
+          id: firstAttached.id,
+          url: firstAttached.url,
+          kind: firstAttached.kind,
+          altText: firstAttached.altText || undefined,
+          aiPrompt: firstAttached.aiPrompt || undefined,
+          aiGenerated: firstAttached.aiGenerated,
+        }
+      : null,
+  );
   const [copied, setCopied] = useState(false);
 
   const [savedDraftId, setSavedDraftId] = useState<string | null>(initialDraft?.id ?? null);
@@ -237,6 +253,7 @@ export default function StudioClient({
         if (selectedMedia) {
           await attachIllustrationAction(org, {
             draftId: res.draftId,
+            mediaAssetId: selectedMedia.id,
             kind: selectedMedia.kind,
             url: selectedMedia.url,
             altText: selectedMedia.altText,
@@ -264,12 +281,34 @@ export default function StudioClient({
         });
         if (res.ok && res.draftId) {
           setSavedDraftId(res.draftId);
+          if (selectedMedia) {
+            await attachIllustrationAction(org, {
+              draftId: res.draftId,
+              mediaAssetId: selectedMedia.id,
+              kind: selectedMedia.kind,
+              url: selectedMedia.url,
+              altText: selectedMedia.altText,
+              aiPrompt: selectedMedia.aiPrompt,
+              aiGenerated: selectedMedia.aiGenerated,
+            });
+          }
           completePublish(res.draftId);
         } else {
           setStatusMessage({ type: 'error', text: 'Impossible d’enregistrer le brouillon avant publication.' });
         }
       });
     } else {
+      if (selectedMedia && savedDraftId) {
+        attachIllustrationAction(org, {
+          draftId: savedDraftId,
+          mediaAssetId: selectedMedia.id,
+          kind: selectedMedia.kind,
+          url: selectedMedia.url,
+          altText: selectedMedia.altText,
+          aiPrompt: selectedMedia.aiPrompt,
+          aiGenerated: selectedMedia.aiGenerated,
+        }).catch(() => {});
+      }
       completePublish(savedDraftId);
     }
   }
@@ -709,11 +748,13 @@ export default function StudioClient({
               });
               if (res.ok && res.asset) {
                 setSelectedMedia({
+                  id: res.asset.id,
                   url: res.asset.url,
                   kind: 'AI_GENERATED',
                   aiPrompt: prompt,
                   altText: altText || res.asset.altText || undefined,
                   aiGenerated: true,
+                  licenseNote: res.asset.licenseNote || undefined,
                 });
                 return { ok: true, url: res.asset.url };
               }

@@ -28,5 +28,5 @@ export interface IllustrationResult {
 export interface AiAdapter {
   readonly providerName: string;
   generatePostVariants(req: PostVariantRequest): Promise<PostVariant[]>;
-  generateIllustration(prompt: string, aspectRatio?: '16:9' | '1:1' | '4:5'): Promise<IllustrationResult>;
+  generateIllustration(prompt: string, aspectRatio?: '16:9' | '1:1' | '4:5' | '9:16'): Promise<IllustrationResult>;
 }

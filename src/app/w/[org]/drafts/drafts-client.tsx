@@ -133,10 +133,25 @@ export default function DraftsClient({
                         Voix : <span className="font-semibold text-foreground">{d.brandVoice.name}</span>
                       </span>
                     )}
+                    {d.mediaAssets?.length > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-accent-cyan/40 bg-accent-cyan/10 px-2 py-0.5 text-[10px] font-bold text-accent-cyan">
+                        <span>🎨</span>
+                        <span>Visuel attaché</span>
+                      </span>
+                    )}
                   </div>
-                  <p className="line-clamp-2 text-sm text-foreground">
-                    {d.currentContent || 'Brouillon sans contenu'}
-                  </p>
+                  <div className="flex items-start gap-4">
+                    {d.mediaAssets?.[0] && (
+                      <img
+                        src={d.mediaAssets[0].url}
+                        alt="Illustration attachée"
+                        className="h-16 w-24 flex-shrink-0 rounded-xl object-cover border border-border/80 shadow-sm"
+                      />
+                    )}
+                    <p className="line-clamp-2 text-sm text-foreground flex-1">
+                      {d.currentContent || 'Brouillon sans contenu'}
+                    </p>
+                  </div>
 
                   {d.status === 'FAILED' && (
                     <div className="mt-2 rounded-xl border border-danger/40 bg-danger/10 p-2.5 text-xs text-danger flex items-start gap-2">
@@ -213,6 +228,33 @@ export default function DraftsClient({
             <div className="mt-4 rounded-xl border border-border bg-surface-raised p-4 text-xs leading-relaxed whitespace-pre-line text-foreground">
               {selectedDraft.currentContent}
             </div>
+
+            {/* Illustration attachée */}
+            {selectedDraft.mediaAssets && selectedDraft.mediaAssets.length > 0 && selectedDraft.mediaAssets[0] && (
+              <div className="mt-4 rounded-xl border border-border bg-surface-raised/60 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>🎨</span>
+                    <span>Illustration validée pour diffusion</span>
+                  </span>
+                  <span className="rounded-full bg-accent-cyan/10 border border-accent-cyan/30 px-2 py-0.5 text-[10px] font-bold text-accent-cyan">
+                    {selectedDraft.mediaAssets[0]!.kind === 'AI_GENERATED' ? '✦ IA STARS' : 'Média Certifié'}
+                  </span>
+                </div>
+                <div className="overflow-hidden rounded-lg border border-border bg-black/40">
+                  <img
+                    src={selectedDraft.mediaAssets[0]!.url}
+                    alt={selectedDraft.mediaAssets[0]!.altText || 'Illustration'}
+                    className="max-h-60 w-full object-contain"
+                  />
+                </div>
+                {selectedDraft.mediaAssets[0]!.altText && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Alt text : {selectedDraft.mediaAssets[0]!.altText}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Circuit d'approbation */}
             {canApprove && (

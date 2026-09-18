@@ -183,7 +183,7 @@ export class NativeFallbackProvider
     ];
   }
 
-  async generateIllustration(prompt: string, aspectRatio: '16:9' | '1:1' | '4:5'): Promise<ImageGenerationOutput> {
+  async generateIllustration(prompt: string, aspectRatio: '16:9' | '1:1' | '4:5' | '9:16'): Promise<ImageGenerationOutput> {
     return {
       imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
       altText: `Illustration générée pour : ${prompt}`,
