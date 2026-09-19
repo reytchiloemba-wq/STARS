@@ -56,10 +56,10 @@ export default function LandingNav() {
             Connexion
           </Link>
           <Link
-            href="/register"
+            href="/contact-sales"
             className="relative inline-flex items-center justify-center overflow-hidden rounded-xl bg-start-gradient px-4 py-2 text-xs font-bold text-white shadow-md shadow-accent-blue/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-glow-cyan"
           >
-            <span>Démarrer l&apos;essai gratuit</span>
+            <span>Demander un accès</span>
           </Link>
         </div>
 
@@ -98,11 +98,11 @@ export default function LandingNav() {
                 Connexion
               </Link>
               <Link
-                href="/register"
+                href="/contact-sales"
                 onClick={() => setOpen(false)}
                 className="rounded-xl bg-start-gradient px-4 py-2.5 text-center text-xs font-bold text-white shadow"
               >
-                Démarrer l&apos;essai gratuit
+                Demander un accès
               </Link>
             </div>
           </div>

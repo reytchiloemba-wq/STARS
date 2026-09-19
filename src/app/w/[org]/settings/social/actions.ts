@@ -139,22 +139,34 @@ export async function saveFacebookPageTokenAction(
     throw new Error("L'identifiant de la Page et le Jeton d'accès sont obligatoires.");
   }
 
-  // Vérifier le jeton auprès de l'API Graph Meta
+  // Vérifier le jeton et la Page auprès de l'API Graph Meta
   let pageName = customDisplayName?.trim();
   try {
     const testRes = await fetch(
       `https://graph.facebook.com/v21.0/${cleanPageId}?fields=id,name&access_token=${cleanToken}`,
-      { signal: AbortSignal.timeout(6000) },
+      { signal: AbortSignal.timeout(8000) },
     );
-    const testJson = (await testRes.json().catch(() => null)) as { id?: string; name?: string } | null;
+    const testJson = (await testRes.json().catch(() => null)) as {
+      id?: string;
+      name?: string;
+      error?: { message?: string; code?: number };
+    } | null;
+
+    if (testJson?.error) {
+      throw new Error(`Facebook a rejeté cet identifiant ou jeton : ${testJson.error.message}`);
+    }
+
     if (testJson?.name && !pageName) {
       pageName = `${testJson.name} (Page Facebook)`;
     }
-  } catch {
-    // Si réseau indisponible, conserver le nom par défaut
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('Facebook a rejeté')) {
+      throw err;
+    }
+    // Si problème réseau temporaire, continuer avec le nom fourni
   }
 
-  const displayName = pageName || `HORUS Business Automation Engineered (Page Facebook)`;
+  const displayName = pageName || `Page Facebook (${cleanPageId})`;
   const accessTokenEnc = encryptSecret(cleanToken);
 
   await db.socialAccount.upsert({

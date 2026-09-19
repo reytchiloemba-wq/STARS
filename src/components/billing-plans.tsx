@@ -79,7 +79,7 @@ export default function BillingPlans({ org, currentPlanKey }: { org: string; cur
                 </form>
               ) : (
                 <a
-                  href="/register?enterprise=1"
+                  href="/contact-sales?plan=enterprise"
                   className="mt-4 block rounded-lg border border-border px-3 py-2 text-center text-sm font-medium hover:border-accent-cyan"
                 >
                   {plan.cta}

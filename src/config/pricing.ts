@@ -330,9 +330,9 @@ export interface FoundersPromo {
 }
 
 export const FOUNDERS_PROMO: FoundersPromo = {
-  enabled: true,
+  enabled: false,
   badge: 'Programme Fondateurs',
-  discountPercent: 30,
+  discountPercent: 0,
   durationMonths: 12,
   eligiblePlans: ['creator', 'professional', 'business'],
 };

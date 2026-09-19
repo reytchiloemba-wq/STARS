@@ -19,8 +19,8 @@ export default function DualPath() {
             <li>• Technologie</li>
             <li>• URL</li>
           </ul>
-          <a href="/register" className="mt-6 inline-block rounded-lg bg-start-gradient px-5 py-2.5 text-sm font-medium text-white">
-            Analyser un sujet
+          <a href="/contact-sales" className="mt-6 inline-block rounded-lg bg-start-gradient px-5 py-2.5 text-sm font-medium text-white">
+            Demander un accès
           </a>
         </div>
 
@@ -34,8 +34,8 @@ export default function DualPath() {
               </span>
             ))}
           </div>
-          <a href="/register" className="mt-6 inline-block rounded-lg border border-border px-5 py-2.5 text-sm font-medium hover:border-accent-cyan">
-            Explorer l&apos;actualité
+          <a href="/contact-sales" className="mt-6 inline-block rounded-lg border border-border px-5 py-2.5 text-sm font-medium hover:border-accent-cyan">
+            Demander un accès
           </a>
         </div>
       </div>

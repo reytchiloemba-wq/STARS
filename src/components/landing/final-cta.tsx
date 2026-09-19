@@ -9,8 +9,8 @@ export default function FinalCta() {
           Découvrez les sujets qui comptent, confrontez les perspectives et publiez avec crédibilité.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
-          <a href="/register" className="rounded-xl bg-start-gradient px-6 py-3 font-medium text-white">
-            Commencer gratuitement
+          <a href="/contact-sales" className="rounded-xl bg-start-gradient px-6 py-3 font-medium text-white">
+            Demander un accès
           </a>
           <a href="/contact-sales" className="rounded-xl border border-border px-6 py-3 font-medium hover:border-accent-cyan">
             Demander une démonstration

@@ -205,14 +205,14 @@ export default function LandingPricing({ foundersPromo }: { foundersPromo: Promo
 
               {/* CTA Button */}
               <Link
-                href={plan.key === 'enterprise' ? '/contact-sales' : '/register'}
+                href={`/contact-sales?plan=${plan.key}`}
                 className={`mt-8 block rounded-xl py-2.5 text-center text-xs font-bold transition-all duration-300 ${
                   isPopular
                     ? 'bg-start-gradient text-white shadow-md shadow-accent-blue/20 hover:scale-[1.02] hover:shadow-glow-cyan'
                     : 'border border-border/80 bg-surface-raised/60 text-foreground hover:border-accent-cyan hover:bg-surface-raised'
                 }`}
               >
-                {plan.cta}
+                {plan.key === 'enterprise' ? 'Contacter l’équipe commerciale' : 'Demander cet accès'}
               </Link>
             </div>
           );
@@ -330,10 +330,10 @@ export default function LandingPricing({ foundersPromo }: { foundersPromo: Promo
               Forfait recommandé pour votre profil : <strong className="text-accent-cyan font-bold">{PLAN_FRIENDLY_NAMES[recommendedPlan]}</strong>
             </span>
             <Link
-              href={recommendedPlan === 'enterprise' ? '/contact-sales' : '/register'}
+              href={`/contact-sales?plan=${recommendedPlan}`}
               className="rounded-lg bg-start-gradient px-4 py-2 font-bold text-white shadow hover:scale-[1.02] transition-transform"
             >
-              Choisir ce forfait →
+              Demander ce forfait →
             </Link>
           </div>
         </div>

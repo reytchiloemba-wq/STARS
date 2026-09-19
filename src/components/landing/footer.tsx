@@ -35,7 +35,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: 'FAQ', href: '#faq' },
       { label: 'Statut des services', href: '/status' },
       { label: 'Espace Connexion', href: '/login' },
-      { label: 'Créer un compte', href: '/register' },
+      { label: 'Demander un accès', href: '/contact-sales' },
     ],
   },
 ];

@@ -45,6 +45,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin" className="hover:text-foreground">
               Supervision
             </Link>
+            <Link
+              href="/admin/tenants/new"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-start-gradient px-3 py-1.5 font-bold text-white shadow-sm hover:opacity-95 transition"
+            >
+              <span>+ Inscrire un Tenant</span>
+            </Link>
             <Link href="/admin/infrastructure" className="hover:text-foreground">
               Infrastructure &amp; Connexions
             </Link>
