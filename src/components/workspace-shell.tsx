@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import type { RoleName } from '@prisma/client';
+import { InactivityTracker } from './inactivity-tracker';
 
 interface NavGroup {
   title: string;
@@ -277,6 +278,9 @@ export default function WorkspaceShell({
             </button>
           </div>
         </header>
+
+        {/* Tracker d'inactivité (10 min sans utilisation) */}
+        <InactivityTracker />
 
         {/* Contenu principal */}
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">{children}</main>

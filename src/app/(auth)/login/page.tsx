@@ -27,14 +27,26 @@ async function loginAction(formData: FormData) {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; oauthError?: string; callbackUrl?: string }>;
+  searchParams: Promise<{ error?: string; oauthError?: string; callbackUrl?: string; timeout?: string; reason?: string }>;
 }) {
-  const { error, oauthError } = await searchParams;
+  const { error, oauthError, timeout, reason } = await searchParams;
+  const isTimeout = timeout === '1' || reason === 'inactivity';
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-start-glow px-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8 shadow-xl">
         <h1 className="bg-start-gradient bg-clip-text text-2xl font-bold text-transparent">STARS</h1>
         <p className="mt-1 text-sm text-muted-foreground">From the World to Your Voice.</p>
+
+        {isTimeout && (
+          <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2.5 text-xs text-amber-300">
+            <span className="text-base">🔒</span>
+            <div>
+              <strong className="font-semibold text-white block">Session déconnectée</strong>
+              <span>Votre session a été fermée automatiquement après 10 minutes sans utilisation.</span>
+            </div>
+          </div>
+        )}
 
         {error && (
           <p className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
