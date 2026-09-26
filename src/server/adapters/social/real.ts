@@ -18,6 +18,7 @@ export class LinkedInConnector implements SocialConnector {
   /**
    * Registers and uploads an image binary directly to LinkedIn Assets API,
    * returning the digitalmediaAsset URN required for native IMAGE posts.
+   * Supports both remote URLs (HTTPS/HTTP) and local Base64 data URLs (data:image/...).
    */
   private async uploadImageToLinkedIn(
     accessToken: string,
@@ -25,11 +26,33 @@ export class LinkedInConnector implements SocialConnector {
     imageUrl: string,
   ): Promise<string | null> {
     try {
-      // 1. Fetch image binary from the source URL
-      const imgRes = await fetch(imageUrl, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-      if (!imgRes.ok) return null;
-      const imgBlob = await imgRes.arrayBuffer();
-      const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+      // 1. Extract image binary buffer & MIME content-type
+      let imgBytes: Uint8Array;
+      let contentType = 'image/jpeg';
+
+      if (imageUrl.startsWith('data:')) {
+        const matches = imageUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+        if (!matches || !matches[2]) {
+          console.warn('[LinkedInConnector] Format de data URL invalide pour l’illustration');
+          return null;
+        }
+        contentType = matches[1] || 'image/png';
+        const binaryStr = atob(matches[2]);
+        const len = binaryStr.length;
+        imgBytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          imgBytes[i] = binaryStr.charCodeAt(i);
+        }
+      } else {
+        const imgRes = await fetch(imageUrl, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+        if (!imgRes.ok) {
+          console.warn('[LinkedInConnector] Échec du téléchargement de l’image source:', imageUrl, imgRes.status);
+          return null;
+        }
+        const imgBlob = await imgRes.arrayBuffer();
+        imgBytes = new Uint8Array(imgBlob);
+        contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+      }
 
       // 2. Register upload with LinkedIn Assets API
       const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
@@ -69,20 +92,39 @@ export class LinkedInConnector implements SocialConnector {
       const uploadUrl = uploadMechanism?.uploadUrl;
       const assetUrn = registerData?.value?.asset;
 
-      if (!uploadUrl || !assetUrn) return null;
+      if (!uploadUrl || !assetUrn) {
+        console.warn('[LinkedInConnector] Missing uploadUrl or asset in LinkedIn response');
+        return null;
+      }
 
       // 3. Upload raw binary to pre-signed uploadUrl
+      // Microsoft documentation: curl -i --upload-file ... --header "Authorization: Bearer <token>"
       const uploadHeaders: Record<string, string> = {
         'Content-Type': contentType,
+        Authorization: `Bearer ${accessToken}`,
         ...(uploadMechanism?.headers || {}),
       };
 
-      const uploadRes = await fetch(uploadUrl, {
+      let uploadRes = await fetch(uploadUrl, {
         method: 'PUT',
         headers: uploadHeaders,
-        body: new Uint8Array(imgBlob),
+        body: Buffer.from(imgBytes),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
+
+      // Si l'URL pré-signée rejette le header Authorization (HTTP 400), réessaie sans
+      if (uploadRes.status === 400 && uploadHeaders.Authorization) {
+        const fallbackHeaders: Record<string, string> = {
+          'Content-Type': contentType,
+          ...(uploadMechanism?.headers || {}),
+        };
+        uploadRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: fallbackHeaders,
+          body: Buffer.from(imgBytes),
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+      }
 
       if (!uploadRes.ok && uploadRes.status !== 201 && uploadRes.status !== 200) {
         const upErr = await uploadRes.text().catch(() => '');
@@ -110,16 +152,31 @@ export class LinkedInConnector implements SocialConnector {
       // Support URN format : soit profil personnel (person), soit page entreprise (organization)
       let authorUrn = req.socialAccountExternalId;
       if (!authorUrn.startsWith('urn:li:')) {
-        // Les identifiants d'organisations/entreprises LinkedIn sont typiquement numériques ou préfixés
-        const isOrg = /^\d+$/.test(authorUrn) || authorUrn.startsWith('org_');
+        // Les pages entreprises sont soit préfixées 'org_', soit sauvegardées directement avec 'urn:li:organization:...'
+        // Les profils personnels via OpenID userinfo 'sub' peuvent être numériques ou alphanumériques.
+        const isOrg = authorUrn.startsWith('org_');
         const cleanId = authorUrn.replace(/^org_/, '');
         authorUrn = isOrg ? `urn:li:organization:${cleanId}` : `urn:li:person:${cleanId}`;
       }
 
-      const hasMedia = req.mediaUrls && req.mediaUrls.length > 0 && req.mediaUrls[0]!.startsWith('http');
+      const firstMedia = req.mediaUrls && req.mediaUrls.length > 0 ? req.mediaUrls[0] : null;
+      const hasMedia = Boolean(
+        firstMedia &&
+        (firstMedia.startsWith('http://') ||
+         firstMedia.startsWith('https://') ||
+         firstMedia.startsWith('data:image/'))
+      );
+
       let assetUrn: string | null = null;
       if (hasMedia) {
-        assetUrn = await this.uploadImageToLinkedIn(req.accessToken, authorUrn, req.mediaUrls[0]!);
+        assetUrn = await this.uploadImageToLinkedIn(req.accessToken, authorUrn, firstMedia!);
+        if (!assetUrn) {
+          return {
+            success: false,
+            errorMessage:
+              "Échec du téléversement de l'image d'illustration sur LinkedIn. Vérifiez le format (JPEG/PNG/WebP) ou reconnectez votre compte.",
+          };
+        }
       }
 
       const postContent = async (text: string) => {
@@ -133,16 +190,6 @@ export class LinkedInConnector implements SocialConnector {
             {
               status: 'READY',
               media: assetUrn,
-              title: { text: text.slice(0, 100) },
-            },
-          ];
-        } else if (hasMedia) {
-          // Si l'upload binaire d'asset a échoué, repli sur article link
-          shareContent.shareMediaCategory = 'ARTICLE';
-          shareContent.media = [
-            {
-              status: 'READY',
-              originalUrl: req.mediaUrls[0],
               title: { text: text.slice(0, 100) },
             },
           ];

@@ -339,30 +339,24 @@ export default function StudioClient({
       }
 
       // 3. Procéder à la diffusion ou programmation avec le média garanti en base
-      completePublish(activeDraftId);
-    });
-  }
-
-  function completePublish(draftId: string) {
-    startTransition(async () => {
-      const res = await publishOrScheduleAction(org, {
-        draftId,
+      const resPub = await publishOrScheduleAction(org, {
+        draftId: activeDraftId,
         socialAccountIds: selectedAccounts,
         scheduledAt: wantsToSchedule && scheduleDate ? new Date(scheduleDate).toISOString() : undefined,
       });
 
       setShowPublishModal(false);
-      setPublishResults(res.results ?? null);
+      setPublishResults(resPub.results ?? null);
 
-      if (res.scheduled) {
+      if (resPub.scheduled) {
         setStatusMessage({ type: 'success', text: 'Publication programmée avec succès dans votre calendrier éditorial !' });
         return;
       }
 
-      const successCount = res.results?.filter((r) => r.success).length ?? 0;
-      const totalCount = res.results?.length ?? 0;
+      const successCount = resPub.results?.filter((r) => r.success).length ?? 0;
+      const totalCount = resPub.results?.length ?? 0;
 
-      if (res.ok && totalCount > 0 && successCount === totalCount) {
+      if (resPub.ok && totalCount > 0 && successCount === totalCount) {
         setStatusMessage({ type: 'success', text: `Diffusion réussie sur ${successCount} compte(s) officiel(s).` });
       } else if (successCount > 0 && successCount < totalCount) {
         setStatusMessage({
@@ -370,7 +364,7 @@ export default function StudioClient({
           text: `Publication partielle : ${successCount}/${totalCount} compte(s) réussi(s). Détails ci-dessous.`,
         });
       } else {
-        setStatusMessage({ type: 'error', text: res.error || 'Échec de la publication.' });
+        setStatusMessage({ type: 'error', text: resPub.error || 'Échec de la publication.' });
       }
     });
   }

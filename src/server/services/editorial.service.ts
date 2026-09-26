@@ -434,6 +434,17 @@ export class EditorialService {
         where: { id: params.mediaAssetId, organizationId: params.organizationId },
       });
       if (existing) {
+        if (params.draftId) {
+          // Détacher tout autre asset attaché à ce brouillon pour éviter les conflits d'images
+          await db.mediaAsset.updateMany({
+            where: {
+              organizationId: params.organizationId,
+              draftId: params.draftId,
+              id: { not: existing.id },
+            },
+            data: { draftId: null },
+          });
+        }
         return db.mediaAsset.update({
           where: { id: existing.id },
           data: {
@@ -456,6 +467,14 @@ export class EditorialService {
       if (alreadyAttached) {
         return alreadyAttached;
       }
+      // Détacher tout ancien média associé à ce brouillon
+      await db.mediaAsset.updateMany({
+        where: {
+          organizationId: params.organizationId,
+          draftId: params.draftId,
+        },
+        data: { draftId: null },
+      });
     }
 
     // 3. Déduction de crédits UNIQUEMENT si c'est une nouvelle génération non encore facturée
@@ -540,6 +559,16 @@ export class EditorialService {
     }
 
     // 4. Enregistrement dans MediaAsset
+    if (params.draftId) {
+      await db.mediaAsset.updateMany({
+        where: {
+          organizationId: params.organizationId,
+          draftId: params.draftId,
+        },
+        data: { draftId: null },
+      });
+    }
+
     return db.mediaAsset.create({
       data: {
         organizationId: params.organizationId,
@@ -576,7 +605,7 @@ export class EditorialService {
   }) {
     const draft = await db.draft.findFirst({
       where: { id: params.draftId, organizationId: params.organizationId },
-      include: { mediaAssets: true },
+      include: { mediaAssets: { orderBy: { createdAt: 'desc' } } },
     });
     if (!draft) throw new Error('Brouillon introuvable');
 
@@ -716,7 +745,7 @@ export class EditorialService {
       include: {
         publication: {
           include: {
-            draft: { include: { mediaAssets: true } },
+            draft: { include: { mediaAssets: { orderBy: { createdAt: 'desc' } } } },
             targets: { include: { socialAccount: true } },
           },
         },
