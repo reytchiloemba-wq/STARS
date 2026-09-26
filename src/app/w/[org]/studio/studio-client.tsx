@@ -110,7 +110,7 @@ const NETWORKS_SPECS: Record<SocialNetwork, NetworkSpec> = {
   },
 };
 
-const OBJECTIVES = [
+const OBJECTIVES_FR = [
   'Informer & Décrypter une tendance',
   'Partager une analyse d’expert exclusive',
   'Exprimer une vision stratégique de dirigeant',
@@ -119,13 +119,31 @@ const OBJECTIVES = [
   'Valoriser une opportunité commerciale majeure',
 ];
 
-const TONES = [
+const OBJECTIVES_EN = [
+  'Inform & Decrypt an emerging trend',
+  'Share an exclusive expert analysis',
+  'Express an executive leadership perspective',
+  'Spark a debate & drive high engagement',
+  'Alert on a critical market risk',
+  'Highlight a major strategic business opportunity',
+];
+
+const TONES_FR = [
   'Dirigeant & Visionnaire (Inspirant, sobre, mesuré)',
   'Expert & Technique (Factuel, sourcé, précis)',
   'Journalistique & Neutre (Investigation, rigueur)',
   'Pédagogique & Didactique (Accessible, exemples clairs)',
   'Direct & Impactant (Sans détour, verbes d’action)',
   'Leader d’Opinion (Audacieux, prise de position)',
+];
+
+const TONES_EN = [
+  'Executive & Visionary (Inspiring, measured, authoritative)',
+  'Expert & Technical (Data-driven, precise, factual)',
+  'Journalistic & Neutral (Analytical, balanced, rigorous)',
+  'Educational & Instructive (Accessible, step-by-step clarity)',
+  'Direct & Punchy (Bold, action-oriented, engaging)',
+  'Thought Leader (Provocative, market-shaping, visionary)',
 ];
 
 export default function StudioClient({
@@ -146,15 +164,19 @@ export default function StudioClient({
   initialTitle?: string;
   initialSummary?: string;
 }) {
+  const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [network, setNetwork] = useState<SocialNetwork>(initialDraft?.network ?? 'LINKEDIN');
   const [topicTitle, setTopicTitle] = useState(initialTitle);
   const [summary, setSummary] = useState(initialSummary);
-  const [objective, setObjective] = useState(initialDraft?.objective ?? OBJECTIVES[0]);
-  const [tone, setTone] = useState(initialDraft?.tone ?? TONES[0]);
+  const [objective, setObjective] = useState(initialDraft?.objective ?? OBJECTIVES_FR[0]);
+  const [tone, setTone] = useState(initialDraft?.tone ?? TONES_FR[0]);
   const [selectedBrandVoiceId, setSelectedBrandVoiceId] = useState<string>(
     initialDraft?.brandVoiceId ?? (brandVoices[0]?.id || ''),
   );
   const [includeSources, setIncludeSources] = useState(true);
+
+  const currentObjectives = language === 'en' ? OBJECTIVES_EN : OBJECTIVES_FR;
+  const currentTones = language === 'en' ? TONES_EN : TONES_FR;
 
   const [variants, setVariants] = useState<PostVariantItem[]>([]);
   const [activeVariantLabel, setActiveVariantLabel] = useState<string>('concise');
@@ -214,6 +236,7 @@ export default function StudioClient({
         brandVoiceId: selectedBrandVoiceId || undefined,
         includeSources,
         sourceUrls: ['https://stars-ap.com/sources/verified'],
+        language,
       });
 
       if (res.ok && res.variants && res.variants.length > 0) {
@@ -223,9 +246,17 @@ export default function StudioClient({
           setActiveVariantLabel(first.label);
           setEditedContent(first.content);
         }
-        setStatusMessage({ type: 'success', text: '5 variantes stratégiques calibrées avec succès pour ' + activeSpec.name });
+        setStatusMessage({
+          type: 'success',
+          text: language === 'en'
+            ? `5 strategic English variants calibrated successfully for ${activeSpec.name}`
+            : `5 variantes stratégiques calibrées avec succès pour ${activeSpec.name}`,
+        });
       } else {
-        setStatusMessage({ type: 'error', text: res.error || 'Erreur lors de la génération des variantes.' });
+        setStatusMessage({
+          type: 'error',
+          text: res.error || (language === 'en' ? 'Error generating variants.' : 'Erreur lors de la génération des variantes.'),
+        });
       }
     });
   }
@@ -460,15 +491,62 @@ export default function StudioClient({
 
         {/* Formulaire de cadrage du sujet */}
         <div className="mt-6 space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <label className="text-xs font-bold text-muted-foreground">Objectif de communication</label>
+              <label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                <span>🌐</span>
+                <span>Langue de rédaction</span>
+              </label>
+              <div className="mt-1.5 flex h-[38px] items-center rounded-xl border border-border bg-surface-raised/90 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLanguage('fr');
+                    const idx = OBJECTIVES_EN.indexOf(objective || '');
+                    if (idx !== -1 && OBJECTIVES_FR[idx]) setObjective(OBJECTIVES_FR[idx]);
+                    const toneIdx = TONES_EN.indexOf(tone || '');
+                    if (toneIdx !== -1 && TONES_FR[toneIdx]) setTone(TONES_FR[toneIdx]);
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1 text-xs font-semibold transition ${
+                    language === 'fr'
+                      ? 'bg-accent-cyan/20 text-accent-cyan shadow-sm border border-accent-cyan/40 font-bold'
+                      : 'text-muted-foreground hover:text-white'
+                  }`}
+                >
+                  <span>🇫🇷</span>
+                  <span>Français</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLanguage('en');
+                    const idx = OBJECTIVES_FR.indexOf(objective || '');
+                    if (idx !== -1 && OBJECTIVES_EN[idx]) setObjective(OBJECTIVES_EN[idx]);
+                    const toneIdx = TONES_FR.indexOf(tone || '');
+                    if (toneIdx !== -1 && TONES_EN[toneIdx]) setTone(TONES_EN[toneIdx]);
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1 text-xs font-semibold transition ${
+                    language === 'en'
+                      ? 'bg-accent-cyan/20 text-accent-cyan shadow-sm border border-accent-cyan/40 font-bold'
+                      : 'text-muted-foreground hover:text-white'
+                  }`}
+                >
+                  <span>🇬🇧</span>
+                  <span>English</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-muted-foreground">
+                {language === 'en' ? 'Communication Objective' : 'Objectif de communication'}
+              </label>
               <select
                 value={objective}
                 onChange={(e) => setObjective(e.target.value)}
                 className="mt-1.5 w-full rounded-xl border border-border bg-surface-raised/90 px-3 py-2.5 text-xs text-white outline-none transition focus:border-accent-cyan"
               >
-                {OBJECTIVES.map((obj) => (
+                {currentObjectives.map((obj) => (
                   <option key={obj} value={obj}>
                     {obj}
                   </option>
@@ -477,13 +555,15 @@ export default function StudioClient({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-muted-foreground">Posture & Tonalité</label>
+              <label className="text-xs font-bold text-muted-foreground">
+                {language === 'en' ? 'Tone & Stance' : 'Posture & Tonalité'}
+              </label>
               <select
                 value={tone}
                 onChange={(e) => setTone(e.target.value)}
                 className="mt-1.5 w-full rounded-xl border border-border bg-surface-raised/90 px-3 py-2.5 text-xs text-white outline-none transition focus:border-accent-cyan"
               >
-                {TONES.map((t) => (
+                {currentTones.map((t) => (
                   <option key={t} value={t}>
                     {t}
                   </option>
@@ -492,16 +572,22 @@ export default function StudioClient({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-muted-foreground">Mémoire de Marque (Brand Voice)</label>
+              <label className="text-xs font-bold text-muted-foreground">
+                {language === 'en' ? 'Brand Voice Memory' : 'Mémoire de Marque (Brand Voice)'}
+              </label>
               <select
                 value={selectedBrandVoiceId}
                 onChange={(e) => setSelectedBrandVoiceId(e.target.value)}
                 className="mt-1.5 w-full rounded-xl border border-border bg-surface-raised/90 px-3 py-2.5 text-xs text-white outline-none transition focus:border-accent-cyan"
               >
-                <option value="">Voix officielle STARS (Neutre & Haute Précision)</option>
+                <option value="">
+                  {language === 'en'
+                    ? 'Official STARS Voice (Neutral & High Precision)'
+                    : 'Voix officielle STARS (Neutre & Haute Précision)'}
+                </option>
                 {brandVoices.map((bv) => (
                   <option key={bv.id} value={bv.id}>
-                    {bv.name} ({bv.sector || 'Général'})
+                    {bv.name} ({bv.sector || (language === 'en' ? 'General' : 'Général')})
                   </option>
                 ))}
               </select>
@@ -510,20 +596,32 @@ export default function StudioClient({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="text-xs font-bold text-muted-foreground">Sujet ou Angle d&apos;Analyse :</label>
+              <label className="text-xs font-bold text-muted-foreground">
+                {language === 'en' ? 'Topic or Analysis Angle:' : 'Sujet ou Angle d\'Analyse :'}
+              </label>
               <input
                 value={topicTitle}
                 onChange={(e) => setTopicTitle(e.target.value)}
-                placeholder="Ex : L'impact de la nouvelle réglementation européenne sur les semi-conducteurs"
+                placeholder={
+                  language === 'en'
+                    ? 'e.g.: Strategic impact of European semiconductor regulations on supply chains'
+                    : "Ex : L'impact de la nouvelle réglementation européenne sur les semi-conducteurs"
+                }
                 className="mt-1.5 w-full rounded-xl border border-border bg-surface-raised/90 px-3.5 py-2.5 text-xs text-white outline-none transition focus:border-accent-cyan"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-muted-foreground">Notes contextuelles ou Chiffres clés :</label>
+              <label className="text-xs font-bold text-muted-foreground">
+                {language === 'en' ? 'Contextual Notes or Key Figures:' : 'Notes contextuelles ou Chiffres clés :'}
+              </label>
               <input
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                placeholder="Ex : Croissance de +14%, risque d'approvisionnement Q3, investissement de 2.4M€..."
+                placeholder={
+                  language === 'en'
+                    ? 'e.g.: +14% CAGR, Q3 supply risk, €2.4M strategic investment round...'
+                    : "Ex : Croissance de +14%, risque d'approvisionnement Q3, investissement de 2.4M€..."
+                }
                 className="mt-1.5 w-full rounded-xl border border-border bg-surface-raised/90 px-3.5 py-2.5 text-xs text-white outline-none transition focus:border-accent-cyan"
               />
             </div>
@@ -537,7 +635,11 @@ export default function StudioClient({
                 onChange={(e) => setIncludeSources(e.target.checked)}
                 className="h-4 w-4 rounded border-border bg-surface-raised accent-accent-cyan"
               />
-              <span>Citer automatiquement les sources certifiées et horodatées en fin de publication</span>
+              <span>
+                {language === 'en'
+                  ? 'Automatically cite certified timestamped sources at the end of the post'
+                  : 'Citer automatiquement les sources certifiées et horodatées en fin de publication'}
+              </span>
             </label>
 
             <button
@@ -547,7 +649,13 @@ export default function StudioClient({
               className="relative inline-flex items-center justify-center gap-2 rounded-xl bg-start-gradient px-6 py-2.5 text-xs font-bold text-white shadow-lg transition hover:scale-[1.01] hover:opacity-95 disabled:opacity-50"
             >
               <span>✨</span>
-              <span>{isPending ? 'Génération IA en cours…' : `Générer les 5 variantes pour ${activeSpec.name}`}</span>
+              <span>
+                {isPending
+                  ? (language === 'en' ? 'AI Generation in progress…' : 'Génération IA en cours…')
+                  : (language === 'en'
+                      ? `Generate 5 English variants for ${activeSpec.name}`
+                      : `Générer les 5 variantes pour ${activeSpec.name}`)}
+              </span>
             </button>
           </div>
         </div>

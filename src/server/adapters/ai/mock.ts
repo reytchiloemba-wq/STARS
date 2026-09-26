@@ -7,12 +7,15 @@ export class MockAiAdapter implements AiAdapter {
   readonly providerName = 'start-demo-ai-adapter';
 
   async generatePostVariants(req: PostVariantRequest): Promise<PostVariant[]> {
+    const isEn = req.language === 'en';
     const base = `${req.dossierTitle} — ${req.dossierSummary}`;
     const labels: PostVariant['label'][] = ['concise', 'expert', 'executive', 'pedagogical', 'high-engagement'];
     return labels.map((label) => ({
       label,
       isDemoData: true,
-      content: `[Démonstration — variante ${label} / ${req.network} / ton ${req.tone}]\n${base}`,
+      content: isEn
+        ? `[Demo — ${label} variant / ${req.network} / tone: ${req.tone}]\n${base}`
+        : `[Démonstration — variante ${label} / ${req.network} / ton ${req.tone}]\n${base}`,
     }));
   }
 

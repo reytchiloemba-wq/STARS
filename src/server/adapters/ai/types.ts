@@ -5,6 +5,7 @@ export interface PostVariantRequest {
   tone: string;
   brandVoiceName?: string;
   sourceUrls?: string[];
+  language?: 'fr' | 'en';
 }
 
 export interface PostVariant {

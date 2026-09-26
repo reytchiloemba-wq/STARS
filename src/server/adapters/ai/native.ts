@@ -52,7 +52,48 @@ export class NativeAiAdapter implements AiAdapter {
    * Builds the prompt instructing the LLM to generate the 5 STARS post variants
    */
   private buildVariantsPrompt(req: PostVariantRequest): string {
+    const isEn = req.language === 'en';
     const isTikTok = req.network === 'TIKTOK';
+
+    if (isEn) {
+      const networkGuidance = isTikTok
+        ? `TIKTOK FORMAT RULES (Viral 30-60s Video Script):
+- Design each variant as a high-energy video script ready to be shot.
+- Include staging / director notes in brackets: e.g. [Facing camera, punchy zoom], [On-screen text: key statistic], [B-Roll / product demo].
+- Hook: must stop the scroll dead in its tracks within the first 3 seconds.
+- Spoken script, rhythmic, impactful, with strong punchlines and fluid pacing.
+- Final CTA driving comments or debate (e.g., "Share your perspective in the comments", "Follow for part 2").`
+        : `CRITICAL RULES:
+- Every variant MUST be written in flawless, idiomatic English tailored to the algorithmic codes and audience habits of ${req.network}.`;
+
+      return `You are the executive editorial director of the STARS intelligence and publishing platform.
+Generate 5 high-caliber post variants tailored for ${req.network} in English on the following topic:
+
+Topic: ${req.dossierTitle}
+Summary & Key Facts: ${req.dossierSummary}
+Requested Tone: ${req.tone}
+${req.brandVoiceName ? `Brand Voice: ${req.brandVoiceName}` : ''}
+${req.sourceUrls?.length ? `Reference Sources: ${req.sourceUrls.join(', ')}` : ''}
+
+${networkGuidance}
+- Each variant must dive specifically and deeply into "${req.dossierTitle}", embedding concrete arguments, figures, and perspectives from the briefing.
+- NEVER use generic filler or cookie-cutter templates.
+- Write naturally like a top-tier industry thought leader or creator writing in English.
+
+STRICTLY return a valid JSON object containing the "variants" key, which is an array of 5 objects matching this exact structure:
+{
+  "variants": [
+    {
+      "label": "concise" | "expert" | "executive" | "pedagogical" | "high-engagement",
+      "suggestedHook": "High-impact opening hook in English specific to this topic",
+      "content": "Full post text or video script in English with line breaks and formatting",
+      "suggestedCta": "Call to action encouraging comments, debates, or shares",
+      "hashtags": ["#Hashtag1", "#Hashtag2", "#Hashtag3"]
+    }
+  ]
+}`;
+    }
+
     const networkGuidance = isTikTok
       ? `RÈGLES FORMAT TIKTOK (Script Vidéo Viral 30-60s) :
 - Conçois chaque variante comme un script vidéo dynamique prêt à être tourné.
@@ -90,18 +131,27 @@ Retourne STRICTEMENT un objet JSON contenant la clé "variants", qui est un tabl
 }`;
   }
 
-  private mapRawVariants(rawVariants: any[]): PostVariant[] {
-    const labelNames: Record<string, string> = {
-      concise: 'Version Concise',
-      expert: 'Version Experte',
-      executive: 'Version Dirigeant',
-      pedagogical: 'Version Pédagogique',
-      'high-engagement': 'Version Forte en Engagement',
-    };
+  private mapRawVariants(rawVariants: any[], language?: 'fr' | 'en'): PostVariant[] {
+    const isEn = language === 'en';
+    const labelNames: Record<string, string> = isEn
+      ? {
+          concise: 'Concise Version',
+          expert: 'Expert Deep-Dive',
+          executive: 'Executive / C-Level',
+          pedagogical: 'Educational Breakdown',
+          'high-engagement': 'High Engagement / Debate',
+        }
+      : {
+          concise: 'Version Concise',
+          expert: 'Version Experte',
+          executive: 'Version Dirigeant',
+          pedagogical: 'Version Pédagogique',
+          'high-engagement': 'Version Forte en Engagement',
+        };
 
     return rawVariants.map((v: any) => ({
       label: v.label || 'concise',
-      name: labelNames[v.label] || 'Version Éditoriale',
+      name: labelNames[v.label] || (isEn ? 'Editorial Version' : 'Version Éditoriale'),
       content: v.content,
       suggestedHook: v.suggestedHook,
       suggestedCta: v.suggestedCta,
@@ -113,7 +163,7 @@ Retourne STRICTEMENT un objet JSON contenant la clé "variants", qui est un tabl
   /**
    * Calls Anthropic Claude 3.5 Sonnet API
    */
-  private async generateWithAnthropic(prompt: string, apiKey: string): Promise<PostVariant[] | null> {
+  private async generateWithAnthropic(prompt: string, apiKey: string, language?: 'fr' | 'en'): Promise<PostVariant[] | null> {
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -136,7 +186,7 @@ Retourne STRICTEMENT un objet JSON contenant la clé "variants", qui est un tabl
       const text = data.content?.[0]?.text || '';
       const parsed = JSON.parse(text);
       const list = Array.isArray(parsed) ? parsed : parsed.variants || parsed.posts || [];
-      return list.length > 0 ? this.mapRawVariants(list) : null;
+      return list.length > 0 ? this.mapRawVariants(list, language) : null;
     } catch {
       return null;
     }
@@ -145,7 +195,7 @@ Retourne STRICTEMENT un objet JSON contenant la clé "variants", qui est un tabl
   /**
    * Calls OpenAI GPT-4o-mini API
    */
-  private async generateWithOpenAI(prompt: string, apiKey: string): Promise<PostVariant[] | null> {
+  private async generateWithOpenAI(prompt: string, apiKey: string, language?: 'fr' | 'en'): Promise<PostVariant[] | null> {
     try {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -167,7 +217,7 @@ Retourne STRICTEMENT un objet JSON contenant la clé "variants", qui est un tabl
       const json = await res.json();
       const parsed = JSON.parse(json.choices[0].message.content);
       const list = Array.isArray(parsed) ? parsed : parsed.variants || parsed.posts || [];
-      return list.length > 0 ? this.mapRawVariants(list) : null;
+      return list.length > 0 ? this.mapRawVariants(list, language) : null;
     } catch {
       return null;
     }
@@ -176,7 +226,7 @@ Retourne STRICTEMENT un objet JSON contenant la clé "variants", qui est un tabl
   /**
    * Calls Google Gemini 1.5 Flash API
    */
-  private async generateWithGemini(prompt: string, apiKey: string): Promise<PostVariant[] | null> {
+  private async generateWithGemini(prompt: string, apiKey: string, language?: 'fr' | 'en'): Promise<PostVariant[] | null> {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
@@ -197,7 +247,7 @@ Retourne STRICTEMENT un objet JSON contenant la clé "variants", qui est un tabl
 
       const parsed = JSON.parse(text);
       const list = Array.isArray(parsed) ? parsed : parsed.variants || parsed.posts || [];
-      return list.length > 0 ? this.mapRawVariants(list) : null;
+      return list.length > 0 ? this.mapRawVariants(list, language) : null;
     } catch {
       return null;
     }
@@ -212,21 +262,21 @@ Retourne STRICTEMENT un objet JSON contenant la clé "variants", qui est un tabl
     // 1. Try Anthropic Claude 3.5 Sonnet
     const anthropicKey = await this.getApiKey('anthropic');
     if (anthropicKey) {
-      const variants = await this.generateWithAnthropic(prompt, anthropicKey);
+      const variants = await this.generateWithAnthropic(prompt, anthropicKey, req.language);
       if (variants) return variants;
     }
 
     // 2. Try OpenAI GPT-4o-mini
     const openaiKey = await this.getApiKey('openai');
     if (openaiKey) {
-      const variants = await this.generateWithOpenAI(prompt, openaiKey);
+      const variants = await this.generateWithOpenAI(prompt, openaiKey, req.language);
       if (variants) return variants;
     }
 
     // 3. Try Google Gemini
     const geminiKey = await this.getApiKey('gemini');
     if (geminiKey) {
-      const variants = await this.generateWithGemini(prompt, geminiKey);
+      const variants = await this.generateWithGemini(prompt, geminiKey, req.language);
       if (variants) return variants;
     }
 

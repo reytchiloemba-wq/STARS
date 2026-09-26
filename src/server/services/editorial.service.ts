@@ -24,6 +24,7 @@ export interface GenerateVariantsParams {
   brandVoiceId?: string;
   includeSources?: boolean;
   sourceUrls?: string[];
+  language?: 'fr' | 'en';
 }
 
 export interface PostVariantItem {
@@ -38,7 +39,7 @@ export interface PostVariantItem {
 
 export class EditorialService {
   /**
-   * Génère les 5 variantes éditoriales pour un réseau donné
+   * Génère les 5 variantes éditoriales pour un réseau donné (en français ou en anglais)
    */
   static async generateVariants(params: GenerateVariantsParams): Promise<PostVariantItem[]> {
     let brandVoice = null;
@@ -48,13 +49,20 @@ export class EditorialService {
       });
     }
 
-    const baseTone = params.tone || brandVoice?.tone || 'analytique et professionnel';
-    const baseCta = brandVoice?.callToAction || 'Et vous, quel est votre regard sur cette évolution ? Partageons nos avis en commentaire.';
+    const isEn = params.language === 'en';
+    const baseTone = params.tone || brandVoice?.tone || (isEn ? 'analytical and executive' : 'analytique et professionnel');
+    const baseCta = brandVoice?.callToAction || (isEn
+      ? 'What is your perspective on this strategic development? Let\'s discuss in the comments.'
+      : 'Et vous, quel est votre regard sur cette évolution ? Partageons nos avis en commentaire.');
     const defaultHashtags = brandVoice?.hashtags && brandVoice.hashtags.length > 0
       ? brandVoice.hashtags
-      : ['#VeilleStrategique', '#IntelligenceEconomique', '#Innovation'];
+      : (isEn
+          ? ['#MarketIntelligence', '#Strategy', '#Innovation']
+          : ['#VeilleStrategique', '#IntelligenceEconomique', '#Innovation']);
     const sourcesFootnote = params.includeSources && params.sourceUrls?.length
-      ? `\n\n📌 Sources vérifiées :\n${params.sourceUrls.map((s) => `• ${s}`).join('\n')}`
+      ? (isEn
+          ? `\n\n📌 Verified Sources:\n${params.sourceUrls.map((s) => `• ${s}`).join('\n')}`
+          : `\n\n📌 Sources vérifiées :\n${params.sourceUrls.map((s) => `• ${s}`).join('\n')}`)
       : '';
 
     // 1. Tenter la génération intelligente via l'adaptateur IA natif (OpenAI GPT-4o-mini, Anthropic ou Gemini)
@@ -68,6 +76,7 @@ export class EditorialService {
           tone: baseTone,
           brandVoiceName: brandVoice?.name,
           sourceUrls: params.includeSources ? params.sourceUrls : undefined,
+          language: params.language,
         });
 
         if (aiVariants && aiVariants.length > 0 && !aiVariants[0]?.isDemoData) {
@@ -86,11 +95,14 @@ export class EditorialService {
             // FinOps logging non-bloquant
           }
 
+          const defaultName = isEn ? 'Editorial Version' : 'Version Éditoriale';
+          const defaultHook = isEn ? `Hook: ${params.topicTitle}` : `Accroche : ${params.topicTitle}`;
+
           return aiVariants.map((v, i) => ({
             id: `var-${v.label}-${i}`,
             label: v.label,
-            name: v.name || 'Version Éditoriale',
-            suggestedHook: v.suggestedHook || `Accroche : ${params.topicTitle}`,
+            name: v.name || defaultName,
+            suggestedHook: v.suggestedHook || defaultHook,
             content: v.content + (v.content.includes('📌 Sources') ? '' : sourcesFootnote),
             hashtags: v.hashtags?.length ? v.hashtags : defaultHashtags,
             suggestedCta: v.suggestedCta || baseCta,
@@ -102,6 +114,88 @@ export class EditorialService {
     }
 
     // 2. Fallback dynamique calibré spécifiquement sur le sujet et les notes fournies
+    if (isEn) {
+      const summaryClean = params.summary && params.summary !== params.topicTitle
+        ? params.summary
+        : `Major strategic developments and opportunities surrounding ${params.topicTitle}`;
+
+      return [
+        {
+          id: 'var-concise',
+          label: 'concise',
+          name: 'Concise Version',
+          suggestedHook: `⚡ In 60 seconds: ${params.topicTitle}`,
+          content: `⚡ In 60 seconds: ${params.topicTitle}.\n\n` +
+            `📌 Key facts:\n${summaryClean}\n\n` +
+            `💡 2 key takeaways:\n` +
+            `• A defining pivot setting new priorities across the market.\n` +
+            `• A concrete opportunity for forward-looking teams taking action early.\n\n` +
+            `${baseCta}${sourcesFootnote}`,
+          hashtags: defaultHashtags.slice(0, 3),
+          suggestedCta: baseCta,
+        },
+        {
+          id: 'var-expert',
+          label: 'expert',
+          name: 'Expert Deep-Dive',
+          suggestedHook: `🔬 Strategic & Industry Analysis: ${params.topicTitle}`,
+          content: `🔬 Deep-Dive Analysis: ${params.topicTitle}.\n\n` +
+            `Beyond the headlines, let's dissect the core structural drivers:\n\n` +
+            `1. Context breakdown: ${summaryClean}\n` +
+            `2. Impact analysis: recent market shifts accelerate transformation, requiring an immediate recalibration of key performance benchmarks.\n` +
+            `3. Strategic takeaway: prioritize auditing inflection points and validating empirical data.\n\n` +
+            `${baseCta}${sourcesFootnote}`,
+          hashtags: [...defaultHashtags, '#IndustryInsights', '#DeepDive'],
+          suggestedCta: 'Review the underlying metrics and share your perspective.',
+        },
+        {
+          id: 'var-executive',
+          label: 'executive',
+          name: 'Executive / C-Level',
+          suggestedHook: `🎯 C-Suite Perspective: Why ${params.topicTitle} impacts your strategic roadmap`,
+          content: `🎯 Executive Perspective: ${params.topicTitle}.\n\n` +
+            `For board members and business leaders, this shifts 3 immediate priorities:\n\n` +
+            `• Market & Operational context: ${summaryClean}\n` +
+            `• Resource allocation: align core investments with these signals to maintain agility.\n` +
+            `• Competitive posture: lead proactive change rather than reacting to competitive moves.\n\n` +
+            `${baseCta}${sourcesFootnote}`,
+          hashtags: ['#Leadership', '#Strategy', '#ExecutiveInsights'],
+          suggestedCta: 'What are your strategic priorities on this matter?',
+        },
+        {
+          id: 'var-pedagogical',
+          label: 'pedagogical',
+          name: 'Educational Breakdown',
+          suggestedHook: `💡 Simplified Guide: Understanding ${params.topicTitle}`,
+          content: `💡 Why is everyone talking about: ${params.topicTitle}?\n\n` +
+            `Here is the breakdown explained simply in 3 key points:\n\n` +
+            `🔹 Starting point: ${summaryClean}\n` +
+            `🔹 Core challenge: how to adapt smartly without stumbling into typical pitfalls.\n` +
+            `🔹 What changes for you: actionable opportunities ready to be leveraged today.\n\n` +
+            `Clarity is the ultimate competitive advantage.\n\n` +
+            `${baseCta}${sourcesFootnote}`,
+          hashtags: ['#Education', '#Insights', '#TechExplained'],
+          suggestedCta: 'Bookmark or share this post with your team!',
+        },
+        {
+          id: 'var-high-engagement',
+          label: 'high-engagement',
+          name: 'High Engagement / Debate',
+          suggestedHook: `🔥 ${params.topicTitle}: genuine game-changer or passing hype?`,
+          content: `🔥 Opinions are sharply divided on: ${params.topicTitle}.\n\n` +
+            `Here are the undeniable facts on the ground:\n` +
+            `${summaryClean}\n\n` +
+            `Two distinct camps are emerging in the industry:\n` +
+            `👉 Those who dismiss it as short-lived noise.\n` +
+            `👉 Those who recognize a foundational disruption that requires clear positioning.\n\n` +
+            `Where do you stand? Let's discuss in the comments 👇\n\n` +
+            `${baseCta}${sourcesFootnote}`,
+          hashtags: ['#Debate', '#FutureOfWork', '#IndustryTrends'],
+          suggestedCta: 'Drop your take in the comments: lasting revolution or short-lived hype?',
+        },
+      ];
+    }
+
     const summaryClean = params.summary && params.summary !== params.topicTitle ? params.summary : `Évolutions majeures et opportunités stratégiques sur ${params.topicTitle}`;
 
     const variants: PostVariantItem[] = [

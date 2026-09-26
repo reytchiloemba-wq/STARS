@@ -16,6 +16,7 @@ export async function generateVariantsAction(
     brandVoiceId?: string;
     includeSources?: boolean;
     sourceUrls?: string[];
+    language?: 'fr' | 'en';
   },
 ): Promise<{ ok: boolean; variants?: PostVariantItem[]; error?: string }> {
   try {

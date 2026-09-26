@@ -61,6 +61,45 @@ describe('STARS Native Orchestration & Architecture (Without Make)', () => {
     }
   });
 
+  it('generates 5 distinct, high-standard post variants in English when requested', async () => {
+    const variants = await EditorialService.generateVariants({
+      organizationId: testOrgId,
+      userId: testUserId,
+      topicTitle: 'European AI Sovereignty & Data Governance',
+      summary: 'EU initiatives accelerate to guarantee technological independence and GDPR compliance.',
+      network: SocialNetwork.LINKEDIN,
+      objective: 'Executive positioning',
+      language: 'en',
+    });
+
+    expect(variants).toHaveLength(5);
+    const labels = variants.map((v) => v.label);
+    expect(labels).toContain('concise');
+    expect(labels).toContain('expert');
+    expect(labels).toContain('executive');
+    expect(labels).toContain('pedagogical');
+    expect(labels).toContain('high-engagement');
+
+    const concise = variants.find((v) => v.label === 'concise');
+    expect(concise?.name).toBe('Concise Version');
+    expect(concise?.suggestedHook).toContain('In 60 seconds:');
+    expect(concise?.content).toContain('Key facts:');
+
+    const expert = variants.find((v) => v.label === 'expert');
+    expect(expert?.name).toBe('Expert Deep-Dive');
+    expect(expert?.suggestedHook).toContain('Strategic & Industry Analysis:');
+
+    const executive = variants.find((v) => v.label === 'executive');
+    expect(executive?.name).toBe('Executive / C-Level');
+    expect(executive?.suggestedHook).toContain('C-Suite Perspective:');
+
+    for (const v of variants) {
+      expect(v.content.length).toBeGreaterThan(50);
+      expect(v.suggestedHook).toBeDefined();
+      expect(v.suggestedCta).toBeDefined();
+    }
+  });
+
   it('generates native AI illustrations, deducts credits and logs technical costs', async () => {
     // Ensure sufficient credits
     await grantCredits(testOrgId, 10, CreditReason.MANUAL_ADJUSTMENT);
