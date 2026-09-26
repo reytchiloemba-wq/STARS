@@ -272,52 +272,44 @@ export default function StudioClient({
   }
 
   function handlePublishOrSchedule() {
-    if (!savedDraftId) {
-      startTransition(async () => {
-        const res = await saveDraftAction(org, {
-          network,
-          objective,
-          tone,
-          brandVoiceId: selectedBrandVoiceId || undefined,
-          content: editedContent,
-          variantLabel: activeVariantLabel,
-        });
-        if (res.ok && res.draftId) {
-          setSavedDraftId(res.draftId);
-          if (selectedMedia) {
-            await attachIllustrationAction(org, {
-              draftId: res.draftId,
-              mediaAssetId: selectedMedia.id,
-              kind: selectedMedia.kind,
-              url: selectedMedia.url,
-              altText: selectedMedia.altText,
-              aiPrompt: selectedMedia.aiPrompt,
-              aiGenerated: selectedMedia.aiGenerated,
-            });
-          } else {
-            await detachIllustrationAction(org, res.draftId);
-          }
-          completePublish(res.draftId);
-        } else {
-          setStatusMessage({ type: 'error', text: 'Impossible d’enregistrer le brouillon avant publication.' });
-        }
+    startTransition(async () => {
+      // 1. Sauvegarder le brouillon avec le texte à jour
+      const res = await saveDraftAction(org, {
+        draftId: savedDraftId || undefined,
+        network,
+        objective,
+        tone,
+        brandVoiceId: selectedBrandVoiceId || undefined,
+        content: editedContent,
+        variantLabel: activeVariantLabel,
       });
-    } else {
-      if (selectedMedia && savedDraftId) {
-        attachIllustrationAction(org, {
-          draftId: savedDraftId,
+
+      if (!res.ok || !res.draftId) {
+        setStatusMessage({ type: 'error', text: res.error || 'Impossible d’enregistrer le brouillon avant publication.' });
+        return;
+      }
+
+      const activeDraftId = res.draftId;
+      setSavedDraftId(activeDraftId);
+
+      // 2. Attacher ou détacher l'illustration de manière strictement séquentielle
+      if (selectedMedia) {
+        await attachIllustrationAction(org, {
+          draftId: activeDraftId,
           mediaAssetId: selectedMedia.id,
           kind: selectedMedia.kind,
           url: selectedMedia.url,
           altText: selectedMedia.altText,
           aiPrompt: selectedMedia.aiPrompt,
           aiGenerated: selectedMedia.aiGenerated,
-        }).catch(() => {});
-      } else if (!selectedMedia && savedDraftId) {
-        detachIllustrationAction(org, savedDraftId).catch(() => {});
+        });
+      } else {
+        await detachIllustrationAction(org, activeDraftId);
       }
-      completePublish(savedDraftId);
-    }
+
+      // 3. Procéder à la diffusion ou programmation avec le média garanti en base
+      completePublish(activeDraftId);
+    });
   }
 
   function completePublish(draftId: string) {
@@ -768,6 +760,44 @@ export default function StudioClient({
               return { ok: false, error: res.error };
             }}
           />
+
+          {/* Action Bar après sélection de l'image */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-surface/90 p-4 shadow-md backdrop-blur-md">
+            <div className="text-xs text-muted-foreground flex items-center gap-2">
+              {selectedMedia ? (
+                <span className="flex items-center gap-1.5 text-accent-cyan font-medium">
+                  <span>🖼️</span> Visuel prêt à être diffusé ({selectedMedia.altText || 'Illustration sélectionnée'})
+                </span>
+              ) : (
+                <span>Aucun visuel attaché (format texte seul)</span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                disabled={isPending || !editedContent.trim()}
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-4 py-2.5 text-xs font-semibold text-muted-foreground transition hover:border-border/80 hover:text-white disabled:opacity-50"
+              >
+                <span>💾</span>
+                <span>Enregistrer le brouillon</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusMessage(null);
+                  setPublishResults(null);
+                  setShowPublishModal(true);
+                }}
+                disabled={isPending || !editedContent.trim()}
+                className="inline-flex items-center gap-2 rounded-xl bg-start-gradient px-6 py-2.5 text-xs font-bold text-white shadow-xl transition hover:scale-[1.02] hover:opacity-95 disabled:opacity-50"
+              >
+                <span>🚀 Programmer ou Diffuser</span>
+                <span>→</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Colonne Droite : Simulateur Miroir Fidèle & Recommandations (5 colonnes) */}
@@ -825,6 +855,52 @@ export default function StudioClient({
             </div>
 
             <div className="space-y-4">
+              {/* Récapitulatif Visuel joint */}
+              <div className="rounded-2xl border border-border/80 bg-surface-raised/70 p-3.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  {selectedMedia ? (
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-accent-cyan/40 bg-black/40 shadow">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={selectedMedia.url}
+                        alt={selectedMedia.altText || 'Illustration'}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-surface text-lg text-muted-foreground">
+                      📝
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">
+                        {selectedMedia ? 'Visuel joint au post' : 'Post texte seul'}
+                      </span>
+                      {selectedMedia && (
+                        <span className="rounded-full bg-accent-cyan/20 px-2 py-0.5 text-[9px] font-bold text-accent-cyan border border-accent-cyan/30 shrink-0">
+                          {selectedMedia.aiGenerated ? '✦ IA Vision' : 'Média HD'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                      {selectedMedia
+                        ? selectedMedia.altText || 'L’image sera automatiquement transmise avec votre post'
+                        : 'Aucune image sélectionnée — publication en texte seul'}
+                    </p>
+                  </div>
+                </div>
+                {selectedMedia ? (
+                  <span className="text-xs text-success font-semibold shrink-0 flex items-center gap-1 bg-success/10 border border-success/30 px-2 py-1 rounded-lg">
+                    <span>✓</span> Inclus
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground shrink-0">
+                    Texte brut
+                  </span>
+                )}
+              </div>
+
               {/* Comptes cibles */}
               <div>
                 <label className="text-xs font-bold text-white uppercase tracking-wider">

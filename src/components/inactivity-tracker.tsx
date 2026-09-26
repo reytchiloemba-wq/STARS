@@ -14,7 +14,7 @@ export function InactivityTracker() {
   const [showWarning, setShowWarning] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(60);
   const isLoggingOutRef = useRef(false);
-  const lastRecordedRef = useRef<number>(Date.now());
+  const lastRecordedRef = useRef<number>(0);
 
   // Enregistre l'activité de l'utilisateur
   const recordActivity = useCallback(() => {

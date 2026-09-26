@@ -75,7 +75,7 @@ export default async function LoginPage({
         </form>
 
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          Pas encore de compte ? <a href="/contact-sales" className="text-accent-cyan hover:underline">Demander un accès</a>
+          Pas encore de compte ? <a href="/register" className="text-accent-cyan hover:underline font-semibold">Créer un compte</a>
         </p>
       </div>
     </main>

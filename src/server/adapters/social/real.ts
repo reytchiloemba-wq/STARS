@@ -34,6 +34,7 @@ export class LinkedInConnector implements SocialConnector {
         authorUrn = isOrg ? `urn:li:organization:${cleanId}` : `urn:li:person:${cleanId}`;
       }
 
+      const hasMedia = req.mediaUrls && req.mediaUrls.length > 0 && req.mediaUrls[0]!.startsWith('http');
       const postContent = async (text: string) => {
         return fetch('https://api.linkedin.com/v2/ugcPosts', {
           method: 'POST',
@@ -48,7 +49,16 @@ export class LinkedInConnector implements SocialConnector {
             specificContent: {
               'com.linkedin.ugc.ShareContent': {
                 shareCommentary: { text },
-                shareMediaCategory: 'NONE',
+                shareMediaCategory: hasMedia ? 'ARTICLE' : 'NONE',
+                media: hasMedia
+                  ? [
+                      {
+                        status: 'READY',
+                        originalUrl: req.mediaUrls[0],
+                        title: { text: text.slice(0, 100) },
+                      },
+                    ]
+                  : undefined,
               },
             },
             visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
@@ -114,8 +124,16 @@ export class FacebookConnector implements SocialConnector {
     // `socialAccountExternalId` must be the Facebook Page id (a Page access
     // token, not a user token, is required to post to a Page's feed).
     try {
-      const params = new URLSearchParams({ message: req.content, access_token: req.accessToken });
-      const res = await fetch(`https://graph.facebook.com/v21.0/${req.socialAccountExternalId}/feed`, {
+      const hasMedia = req.mediaUrls && req.mediaUrls.length > 0 && req.mediaUrls[0]!.startsWith('http');
+      const endpoint = hasMedia
+        ? `https://graph.facebook.com/v21.0/${req.socialAccountExternalId}/photos`
+        : `https://graph.facebook.com/v21.0/${req.socialAccountExternalId}/feed`;
+      const params = new URLSearchParams(
+        hasMedia
+          ? { url: req.mediaUrls[0]!, caption: req.content, access_token: req.accessToken }
+          : { message: req.content, access_token: req.accessToken }
+      );
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params,

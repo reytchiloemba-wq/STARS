@@ -3,7 +3,8 @@ import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { getPlan, type PlanKey } from '@/config/pricing';
 import { applyCreditPackPurchase, applyCommentPackPurchase } from '@/server/services/billing.service';
-import { SubStatus, BillingCycle } from '@prisma/client';
+import { grantCredits } from '@/server/services/credits.service';
+import { SubStatus, BillingCycle, CreditReason } from '@prisma/client';
 
 // Stripe requires the raw, unparsed request body to verify the webhook
 // signature — do not let Next.js body-parse this route.
@@ -107,6 +108,13 @@ export async function POST(req: Request): Promise<Response> {
             currentPeriodEnd: getCurrentPeriodEnd(stripeSubscription),
           },
         });
+
+        if (plan.quotas.creditsPerMonth > 0) {
+          await grantCredits(organizationId, plan.quotas.creditsPerMonth, CreditReason.MONTHLY_ALLOWANCE, {
+            stripeSessionId: session.id,
+            planKey: plan.key,
+          });
+        }
       }
       break;
     }

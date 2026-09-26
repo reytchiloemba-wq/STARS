@@ -63,10 +63,10 @@ export default function LandingHero() {
             {/* CTAs */}
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link
-                href="/contact-sales"
+                href="/register"
                 className="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-start-gradient px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-accent-blue/25 transition-all duration-300 hover:scale-[1.02] hover:shadow-glow-cyan"
               >
-                <span>Demander un accès</span>
+                <span>Commencer l&apos;essai gratuit</span>
                 <span className="transition-transform group-hover:translate-x-1">→</span>
               </Link>
 

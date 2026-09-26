@@ -205,14 +205,24 @@ export default function LandingPricing({ foundersPromo }: { foundersPromo: Promo
 
               {/* CTA Button */}
               <Link
-                href={`/contact-sales?plan=${plan.key}`}
+                href={
+                  plan.key === 'enterprise'
+                    ? '/contact-sales?plan=enterprise'
+                    : `/register?plan=${plan.key}&cycle=${cycle}`
+                }
                 className={`mt-8 block rounded-xl py-2.5 text-center text-xs font-bold transition-all duration-300 ${
                   isPopular
                     ? 'bg-start-gradient text-white shadow-md shadow-accent-blue/20 hover:scale-[1.02] hover:shadow-glow-cyan'
                     : 'border border-border/80 bg-surface-raised/60 text-foreground hover:border-accent-cyan hover:bg-surface-raised'
                 }`}
               >
-                {plan.key === 'enterprise' ? 'Contacter l’équipe commerciale' : 'Demander cet accès'}
+                {plan.key === 'enterprise'
+                  ? 'Contacter l’équipe commerciale'
+                  : plan.key === 'discovery'
+                    ? 'Commencer gratuitement'
+                    : plan.trialDays
+                      ? `Essayer ${plan.name} (${plan.trialDays}j gratuits)`
+                      : `Choisir ${plan.name}`}
               </Link>
             </div>
           );

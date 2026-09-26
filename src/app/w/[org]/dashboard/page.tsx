@@ -2,8 +2,15 @@ import { resolveTenant } from '@/lib/tenant';
 import { db } from '@/lib/db';
 import Link from 'next/link';
 
-export default async function DashboardPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function DashboardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams?: Promise<{ checkout?: string; welcome?: string; plan?: string; demo?: string }>;
+}) {
   const { org } = await params;
+  const sp = searchParams ? await searchParams : {};
   const ctx = await resolveTenant(org);
 
   const [
@@ -38,6 +45,39 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
 
   return (
     <div className="space-y-8">
+      {/* Bannières de bienvenue / Confirmation paiement Stripe */}
+      {sp.checkout === 'success' && (
+        <div className="flex items-center gap-3 rounded-2xl border border-success/40 bg-gradient-to-r from-success/20 via-success/10 to-transparent p-4 text-sm text-success shadow-lg shadow-success/10 backdrop-blur-md">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-success/20 text-lg">
+            🎉
+          </span>
+          <div className="flex-1">
+            <strong className="block text-base font-bold text-white">
+              Paiement confirmé &amp; Abonnement activé !
+            </strong>
+            <span className="text-xs text-success-foreground/90">
+              Votre souscription a bien été enregistrée. Vos crédits STARS Intelligence ont été crédités sur votre portefeuille.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {sp.welcome === '1' && !sp.checkout && (
+        <div className="flex items-center gap-3 rounded-2xl border border-accent-cyan/40 bg-gradient-to-r from-accent-cyan/20 via-accent-cyan/10 to-transparent p-4 text-sm text-accent-cyan shadow-lg shadow-accent-cyan/10 backdrop-blur-md">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-cyan/20 text-lg">
+            👋
+          </span>
+          <div className="flex-1">
+            <strong className="block text-base font-bold text-white">
+              Bienvenue sur STARS !
+            </strong>
+            <span className="text-xs text-muted-foreground">
+              Votre organisation {ctx.organization.name} a été créée avec succès. Vous pouvez désormais configurer vos thématiques et explorer les signaux faibles.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* En-tête Salutation et Actions rapides */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>

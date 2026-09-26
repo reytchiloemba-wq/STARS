@@ -306,7 +306,7 @@ export default async function SocialSettingsPage({
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] text-muted-foreground block mb-0.5">Jeton d'accès (Page Access Token)</label>
+                              <label className="text-[10px] text-muted-foreground block mb-0.5">Jeton d&apos;accès (Page Access Token)</label>
                               <input
                                 name="token"
                                 type="password"
@@ -371,7 +371,7 @@ export default async function SocialSettingsPage({
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] text-muted-foreground block mb-0.5">Jeton d'accès (Page Access Token)</label>
+                              <label className="text-[10px] text-muted-foreground block mb-0.5">Jeton d&apos;accès (Page Access Token)</label>
                               <input
                                 name="token"
                                 type="password"
