@@ -30,6 +30,7 @@ describe('LinkedInConnector Image & Text Publishing', () => {
       network: 'LINKEDIN',
       content: 'Hello LinkedIn network!',
       mediaUrls: [],
+      idempotencyKey: 'idem-test-1',
     });
 
     expect(result.success).toBe(true);
@@ -102,6 +103,7 @@ describe('LinkedInConnector Image & Text Publishing', () => {
       network: 'LINKEDIN',
       content: 'Exciting breakthrough in quantum computing! Check out our new findings.',
       mediaUrls: ['https://images.unsplash.com/photo-test-123'],
+      idempotencyKey: 'idem-test-2',
     });
 
     expect(result.success).toBe(true);
