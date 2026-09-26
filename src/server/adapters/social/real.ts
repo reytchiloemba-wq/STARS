@@ -15,6 +15,88 @@ export class LinkedInConnector implements SocialConnector {
     return true;
   }
 
+  /**
+   * Registers and uploads an image binary directly to LinkedIn Assets API,
+   * returning the digitalmediaAsset URN required for native IMAGE posts.
+   */
+  private async uploadImageToLinkedIn(
+    accessToken: string,
+    authorUrn: string,
+    imageUrl: string,
+  ): Promise<string | null> {
+    try {
+      // 1. Fetch image binary from the source URL
+      const imgRes = await fetch(imageUrl, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+      if (!imgRes.ok) return null;
+      const imgBlob = await imgRes.arrayBuffer();
+      const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+
+      // 2. Register upload with LinkedIn Assets API
+      const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
+        body: JSON.stringify({
+          registerUploadRequest: {
+            recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+            owner: authorUrn,
+            serviceRelationships: [
+              {
+                identifier: 'urn:li:userGeneratedContent',
+                relationshipType: 'OWNER',
+              },
+            ],
+            supportedUploadMechanism: ['SYNCHRONOUS_UPLOAD'],
+          },
+        }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+
+      if (!registerRes.ok) {
+        const errText = await registerRes.text().catch(() => '');
+        console.warn('[LinkedInConnector] registerUpload failed:', registerRes.status, errText);
+        return null;
+      }
+
+      const registerData = await registerRes.json();
+      const uploadMechanism =
+        registerData?.value?.uploadMechanism?.[
+          'com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'
+        ];
+      const uploadUrl = uploadMechanism?.uploadUrl;
+      const assetUrn = registerData?.value?.asset;
+
+      if (!uploadUrl || !assetUrn) return null;
+
+      // 3. Upload raw binary to pre-signed uploadUrl
+      const uploadHeaders: Record<string, string> = {
+        'Content-Type': contentType,
+        ...(uploadMechanism?.headers || {}),
+      };
+
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: uploadHeaders,
+        body: new Uint8Array(imgBlob),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+
+      if (!uploadRes.ok && uploadRes.status !== 201 && uploadRes.status !== 200) {
+        const upErr = await uploadRes.text().catch(() => '');
+        console.warn('[LinkedInConnector] binary upload failed:', uploadRes.status, upErr);
+        return null;
+      }
+
+      return assetUrn;
+    } catch (err) {
+      console.warn('[LinkedInConnector] Failed to upload image to LinkedIn:', err);
+      return null;
+    }
+  }
+
   async publish(req: SocialPublishRequest): Promise<SocialPublishResult> {
     if (!req.accessToken) return { success: false, errorMessage: 'Aucun jeton LinkedIn disponible pour ce compte.' };
 
@@ -35,7 +117,39 @@ export class LinkedInConnector implements SocialConnector {
       }
 
       const hasMedia = req.mediaUrls && req.mediaUrls.length > 0 && req.mediaUrls[0]!.startsWith('http');
+      let assetUrn: string | null = null;
+      if (hasMedia) {
+        assetUrn = await this.uploadImageToLinkedIn(req.accessToken, authorUrn, req.mediaUrls[0]!);
+      }
+
       const postContent = async (text: string) => {
+        const shareContent: Record<string, any> = {
+          shareCommentary: { text },
+        };
+
+        if (assetUrn) {
+          shareContent.shareMediaCategory = 'IMAGE';
+          shareContent.media = [
+            {
+              status: 'READY',
+              media: assetUrn,
+              title: { text: text.slice(0, 100) },
+            },
+          ];
+        } else if (hasMedia) {
+          // Si l'upload binaire d'asset a échoué, repli sur article link
+          shareContent.shareMediaCategory = 'ARTICLE';
+          shareContent.media = [
+            {
+              status: 'READY',
+              originalUrl: req.mediaUrls[0],
+              title: { text: text.slice(0, 100) },
+            },
+          ];
+        } else {
+          shareContent.shareMediaCategory = 'NONE';
+        }
+
         return fetch('https://api.linkedin.com/v2/ugcPosts', {
           method: 'POST',
           headers: {
@@ -47,19 +161,7 @@ export class LinkedInConnector implements SocialConnector {
             author: authorUrn,
             lifecycleState: 'PUBLISHED',
             specificContent: {
-              'com.linkedin.ugc.ShareContent': {
-                shareCommentary: { text },
-                shareMediaCategory: hasMedia ? 'ARTICLE' : 'NONE',
-                media: hasMedia
-                  ? [
-                      {
-                        status: 'READY',
-                        originalUrl: req.mediaUrls[0],
-                        title: { text: text.slice(0, 100) },
-                      },
-                    ]
-                  : undefined,
-              },
+              'com.linkedin.ugc.ShareContent': shareContent,
             },
             visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
           }),
